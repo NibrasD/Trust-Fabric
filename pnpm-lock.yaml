@@ -193,6 +193,9 @@ importers:
       pino-http:
         specifier: ^10
         version: 10.5.0
+      wabt:
+        specifier: ^1.0.39
+        version: 1.0.39
     devDependencies:
       '@types/cookie-parser':
         specifier: ^1.4.10
@@ -3289,6 +3292,10 @@ packages:
       yaml:
         optional: true
 
+  wabt@1.0.39:
+    resolution: {integrity: sha512-ba+dRL/75VQQY7RkU/CgriGbkoWAfS8TDyUlJfJhJ8KhtXgMl5dhNvoPNUcQ9IWRhW8u41glMSuZeTvsYq2rRg==}
+    hasBin: true
+
   which-typed-array@1.1.20:
     resolution: {integrity: sha512-LYfpUkmqwl0h9A2HL09Mms427Q1RZWuOHsukfVcKRq9q95iQxdw0ix1JQrqbcDR9PH1QDwf5Qo8OZb5lksZ8Xg==}
     engines: {node: '>= 0.4'}
@@ -6005,6 +6012,8 @@ snapshots:
       lightningcss: 1.31.1
       tsx: 4.21.0
       yaml: 2.8.2
+
+  wabt@1.0.39: {}
 
   which-typed-array@1.1.20:
     dependencies:

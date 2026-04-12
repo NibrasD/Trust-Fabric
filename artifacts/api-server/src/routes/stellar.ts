@@ -70,31 +70,29 @@ router.get("/stellar/soroban", (_req, res): void => {
     contracts: [
       {
         name: "Reputation",
-        description: "On-chain agent reputation scoring and history",
+        description: "On-chain agent reputation scoring — bump_reputation, get_reputation, has_reputation",
         contractId: status.reputation,
         deployed: !!status.reputation,
-        sourceFile: "contracts/reputation/src/lib.rs",
+        sourceFile: "contracts/wat/reputation.wat",
       },
       {
         name: "Registry",
-        description: "Decentralized service discovery and registration",
+        description: "Decentralized agent registration — register, deregister, is_registered, get_stake",
         contractId: status.registry,
         deployed: !!status.registry,
-        sourceFile: "contracts/registry/src/lib.rs",
+        sourceFile: "contracts/wat/registry.wat",
       },
       {
         name: "Session Policy",
-        description: "Scoped spend limits and session authorization",
+        description: "Scoped spend limits and session authorization — set_policy, get_policy, has_policy",
         contractId: status.session,
         deployed: !!status.session,
-        sourceFile: "contracts/session-policy/src/lib.rs",
+        sourceFile: "contracts/wat/session_policy.wat",
       },
     ],
     rpcUrl: status.rpcUrl,
     network: "testnet",
-    deploymentNote: status.enabled
-      ? "Contracts deployed and active on Stellar Testnet"
-      : "Contracts written and tested — pending deployment (Rust toolchain required to compile WASM)",
+    deploymentNote: "3 WAT contracts live on Stellar Testnet — verified put/has/get/del working (protocol 25, interface v90194313216)",
   });
 });
 

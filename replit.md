@@ -18,8 +18,18 @@ Enables AI agents to:
 - **Payment Asset**: USDC (issuer `GBB6YO4V5K37CXZV4N3ZG4X7NQBCOSSFFQ566CAWSXGMCDIG63GH7UCZ`) — all 6 service accounts + demo agent have 100+ USDC funded; set via `USDC_ISSUER` env var
 - **Friendbot**: `createAndFundTestnetAccount()` creates and funds real Stellar Testnet keypairs
 - **Demo Agent**: `examples/demo-agent/agent.ts` shows full x402 cycle with `--real-payment` flag for real Stellar tx; uses correct USDC issuer
-- **Soroban Integration**: `soroban.ts` uses `rpc.Server` + `Contract.call()` to invoke reputation/session/registry contracts; graceful fallback when env vars not set
+- **Soroban Integration**: `soroban.ts` uses `Operation.invokeContractFunction` + `rpc.assembleTransaction` to invoke WAT-compiled contracts; always enabled with hardcoded defaults
 - **Soroban Status API**: `GET /api/stellar/soroban` returns contract deployment status (shown on Dashboard)
+- **Deployed Contracts (Stellar Testnet, April 2026)**:
+  - Reputation: `CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6`
+  - Registry: `CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA`
+  - Session Policy: `CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7`
+- **WAT Contract Findings**: Soroban host function mapping (interface v90194313216 / protocol 21 style on protocol 25):
+  - `l."0"` = has_contract_data(key, storage_type) → Bool
+  - `l."1"` = get_contract_data(key, storage_type) → Val
+  - `l."2"` = del_contract_data(key, storage_type) → Void
+  - `l."_"` = put_contract_data(key, val, storage_type) → Void
+  - Valid storage_type: Void(1)=Temporary, False(0)=Instance — both confirmed working via simulation + execution
 
 ## Funded Testnet Accounts
 
