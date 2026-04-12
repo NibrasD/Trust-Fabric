@@ -12,6 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 
+function truncateHash(hash: string, chars = 12): string {
+  if (!hash || hash.length <= chars * 2) return hash;
+  return `${hash.slice(0, chars)}...${hash.slice(-6)}`;
+}
+
 const formSchema = z.object({
   agentId: z.string().min(1, "Please select an agent"),
   serviceId: z.string().min(1, "Please select a service"),
