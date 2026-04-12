@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Stellar Agent Trust Fabric"
+version = "1.0.0"
+id = "artifacts/trust-fabric"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24725
+
+[services.development]
+run = "pnpm --filter @workspace/trust-fabric run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/trust-fabric", "run", "build" ]
+publicDir = "artifacts/trust-fabric/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24725"
+BASE_PATH = "/"

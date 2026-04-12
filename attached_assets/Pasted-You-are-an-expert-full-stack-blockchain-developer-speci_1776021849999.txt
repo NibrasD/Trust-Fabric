@@ -1,0 +1,85 @@
+You are an expert full-stack blockchain developer specializing in Stellar, Soroban smart contracts, and AI agent systems.
+
+Build a complete open-source project called **"Stellar Agent Trust Fabric"** for the Stellar Agents x402 Hackathon.
+
+### Project Overview
+Stellar Agent Trust Fabric is a trust and permission layer for AI agents on Stellar. It enables autonomous agents to:
+- Discover and pay for services using **x402 micropayments** (and optionally MPP).
+- Operate with **scoped, temporary, and limited permissions** (no unlimited wallet access).
+- Build and maintain an **on-chain reputation score** based on payment history and post-transaction ratings (no lending, no interest, no staking, no slashing).
+
+Core features (no DeFi, no loans, no yield):
+1. **Scoped Session Permissions**: Agents get temporary "session keys" or contract account authorizations that allow:
+   - Maximum spend limit (e.g., 0.5 USDC per session).
+   - Specific allowed endpoints only.
+   - Time-limited (e.g., 1 hour or one task).
+   - Everything enforced via Soroban smart contracts.
+
+2. **On-Chain Reputation System**:
+   - Each agent (identified by contract account or public key) has a reputation profile.
+   - Reputation increases based on successful x402 payments + rating (1-5 stars) from the service provider after delivery.
+   - Weighted by payment amount (higher value transactions = more weight).
+   - Stored on Soroban with simple mapping (agent_address → score, total_transactions, avg_rating).
+
+3. **Agent Discovery Marketplace** (light version):
+   - A simple registry where service providers list their x402-protected endpoints with price and category.
+   - Agents can query the registry and get results sorted by reputation + price.
+
+4. **Integration with x402 and MPP**:
+   - All payments must go through real x402 flow (402 response → payment → access).
+   - Support USDC (or any SAC token) via Stellar.
+
+### Technical Stack (must use):
+- **Backend**: Node.js + Express (or TypeScript)
+- **Smart Contracts**: Rust + Soroban (for reputation storage, session authorization policy, and any on-chain registry)
+- **x402 Integration**: Use official packages:
+  - `@x402/express` or `x402-stellar` / `stellar-x402`
+  - OpenZeppelin x402 Facilitator (or self-hosted facilitator from stellar/x402-stellar repo)
+- **MPP** (optional but recommended): `@stellar/mpp` for machine-to-machine flows
+- **Frontend**: React + Tailwind (simple dashboard to:
+  - View agent reputation
+  - Create scoped sessions
+  - Test x402 payments
+  - Browse registered services)
+- **Stellar SDK**: @stellar/stellar-sdk + Soroban client
+- **Deployment**: Testnet first, with clear instructions for mainnet
+
+### Project Structure (follow this):
+
+/stellar-agent-trust-fabric
+├── contracts/                  # Soroban Rust contracts
+│   ├── reputation/
+│   ├── session-policy/         # Scoped authorization logic
+│   └── registry/               # Optional service registry
+├── backend/                    # Node.js server with x402 middleware
+├── frontend/                   # React dashboard
+├── sdk/                        # Optional TypeScript SDK for agents to interact with the fabric
+├── examples/                   # Demo agent (simple LangChain or custom agent that uses the system)
+├── docs/
+│   ├── README.md               # Full hackathon submission ready
+│   ├── ARCHITECTURE.md
+│   └── DEMO.md
+└── .env.example
+### Requirements for Hackathon Submission:
+- All payments must be real on-chain x402 transactions on **Stellar Testnet**.
+- Include a **2-3 minute demo video script** (describe what to show).
+- Full open-source on GitHub with clear README (problem, solution, how to run locally, testnet demo links, transaction examples).
+- No loans, no interest, no staking, no slashing — keep it clean micropayments + trust only.
+
+### Step-by-step instructions you must follow:
+1. First, design the Soroban contracts (reputation storage + session policy using contract account authorization features).
+2. Implement x402 middleware on the backend that checks reputation before allowing high-value calls.
+3. Build a simple example "paid API" (e.g., AI summarizer or data fetch) protected by x402.
+4. Create a demo agent that autonomously requests a service, pays via x402, rates it, and updates reputation.
+5. Build the React dashboard to visualize everything.
+6. At the end, output:
+   - Complete folder structure with key file contents.
+   - Deployment instructions.
+   - Hackathon README section (Title, Description, Tech used, Why it fits the hackathon, Future vision).
+
+Start by outlining the architecture, then implement the Soroban contracts first, then backend, then frontend.
+
+Make the code production-ready, well-commented, and secure. Use best practices for Soroban (authorization, error handling, events).
+
+Begin now.
+

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "reputation",
+    "session-policy",
+    "registry",
+]
+resolver = "2"

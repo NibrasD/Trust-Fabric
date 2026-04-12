@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Stellar Agent Trust Fabric API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: agents
+    description: Agent reputation management
+  - name: sessions
+    description: Scoped session permissions
+  - name: services
+    description: Service registry / marketplace
+  - name: payments
+    description: x402 payment records and flows
+  - name: ratings
+    description: Post-transaction ratings
+  - name: demo
+    description: Demo agent simulation
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,493 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Agents ──────────────────────────────────────────────────────────────────
+  /agents:
+    get:
+      operationId: listAgents
+      tags: [agents]
+      summary: List all registered agents sorted by reputation
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Agent"
+                  total:
+                    type: integer
+                required: [agents, total]
+
+    post:
+      operationId: registerAgent
+      tags: [agents]
+      summary: Register a new agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterAgentBody"
+      responses:
+        "201":
+          description: Agent registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+
+  /agents/{agentId}:
+    get:
+      operationId: getAgent
+      tags: [agents]
+      summary: Get agent details and reputation
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agents/stats/summary:
+    get:
+      operationId: getAgentsSummary
+      tags: [agents]
+      summary: Dashboard summary — total agents, avg reputation, total payments
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentsSummary"
+
+  /agents/{agentId}/activity:
+    get:
+      operationId: getAgentActivity
+      tags: [agents]
+      summary: Recent payments and ratings for an agent
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10 }
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Payment"
+                  ratings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Rating"
+                required: [payments, ratings]
+
+  # ── Sessions ─────────────────────────────────────────────────────────────────
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List sessions (optionally filtered by agent)
+      parameters:
+        - in: query
+          name: agentId
+          schema: { type: string }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, expired, revoked]
+      responses:
+        "200":
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Session"
+                required: [sessions]
+
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new scoped session for an agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionBody"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session details
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{sessionId}/revoke:
+    post:
+      operationId: revokeSession
+      tags: [sessions]
+      summary: Revoke an active session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  # ── Services ─────────────────────────────────────────────────────────────────
+  /services:
+    get:
+      operationId: listServices
+      tags: [services]
+      summary: Browse service registry sorted by reputation + price
+      parameters:
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: maxPrice
+          schema: { type: number }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Service list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Service"
+                  total:
+                    type: integer
+                required: [services, total]
+
+    post:
+      operationId: registerService
+      tags: [services]
+      summary: Register a new x402-protected service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterServiceBody"
+      responses:
+        "201":
+          description: Service registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+  /services/{serviceId}:
+    get:
+      operationId: getService
+      tags: [services]
+      summary: Get service details
+      parameters:
+        - in: path
+          name: serviceId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Service details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /services/categories/counts:
+    get:
+      operationId: getServiceCategoryCounts
+      tags: [services]
+      summary: Count of services per category (for dashboard)
+      responses:
+        "200":
+          description: Category breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category:
+                          type: string
+                        count:
+                          type: integer
+                      required: [category, count]
+                required: [categories]
+
+  # ── Payments ─────────────────────────────────────────────────────────────────
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List recent x402 payment records
+      parameters:
+        - in: query
+          name: agentId
+          schema: { type: string }
+        - in: query
+          name: serviceId
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Payment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Payment"
+                  total:
+                    type: integer
+                required: [payments, total]
+
+  /payments/{paymentId}:
+    get:
+      operationId: getPayment
+      tags: [payments]
+      summary: Get a specific payment record
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /payments/stats/volume:
+    get:
+      operationId: getPaymentVolume
+      tags: [payments]
+      summary: Payment volume stats over time (for charts)
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 7 }
+      responses:
+        "200":
+          description: Volume stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dailyVolume:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                        totalAmount:
+                          type: number
+                        count:
+                          type: integer
+                      required: [date, totalAmount, count]
+                  totalVolume:
+                    type: number
+                  totalCount:
+                    type: integer
+                required: [dailyVolume, totalVolume, totalCount]
+
+  # ── Ratings ─────────────────────────────────────────────────────────────────
+  /ratings:
+    post:
+      operationId: submitRating
+      tags: [ratings]
+      summary: Submit post-transaction rating (1-5 stars) for an agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitRatingBody"
+      responses:
+        "201":
+          description: Rating submitted, reputation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rating"
+
+  # ── Protected x402 service endpoint ────────────────────────────────────────
+  /services/paid/summarize:
+    post:
+      operationId: paidSummarize
+      tags: [services]
+      summary: x402-protected AI summarizer endpoint (requires payment)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                agentId:
+                  type: string
+                sessionToken:
+                  type: string
+              required: [text, agentId]
+      responses:
+        "200":
+          description: Summary result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: string
+                  wordCount:
+                    type: integer
+                  paymentRecorded:
+                    type: boolean
+                  paymentId:
+                    type: string
+                required: [summary, wordCount, paymentRecorded]
+        "402":
+          description: Payment Required — x402 flow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequiredResponse"
+
+  # ── Demo agent ───────────────────────────────────────────────────────────────
+  /demo/run:
+    post:
+      operationId: runDemoAgent
+      tags: [demo]
+      summary: Simulate an AI agent doing discovery → payment → rating cycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agentId:
+                  type: string
+                serviceId:
+                  type: string
+                textToSummarize:
+                  type: string
+              required: [agentId, serviceId]
+      responses:
+        "200":
+          description: Demo run results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoRunResult"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +530,360 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        stellarAddress:
+          type: string
+        reputationScore:
+          type: number
+          description: Weighted reputation score 0-100
+        totalTransactions:
+          type: integer
+        avgRating:
+          type: number
+          description: Average star rating 1-5
+        totalSpentUsdc:
+          type: number
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - stellarAddress
+        - reputationScore
+        - totalTransactions
+        - avgRating
+        - totalSpentUsdc
+        - isActive
+        - createdAt
+        - updatedAt
+
+    RegisterAgentBody:
+      type: object
+      properties:
+        name:
+          type: string
+        stellarAddress:
+          type: string
+      required: [name, stellarAddress]
+
+    AgentsSummary:
+      type: object
+      properties:
+        totalAgents:
+          type: integer
+        activeAgents:
+          type: integer
+        avgReputationScore:
+          type: number
+        totalPaymentVolume:
+          type: number
+        totalTransactions:
+          type: integer
+        topAgent:
+          $ref: "#/components/schemas/Agent"
+      required:
+        - totalAgents
+        - activeAgents
+        - avgReputationScore
+        - totalPaymentVolume
+        - totalTransactions
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        agentId:
+          type: string
+        agentName:
+          type: string
+        sessionToken:
+          type: string
+        maxSpendUsdc:
+          type: number
+        spentUsdc:
+          type: number
+        allowedEndpoints:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, expired, revoked]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - agentId
+        - agentName
+        - sessionToken
+        - maxSpendUsdc
+        - spentUsdc
+        - allowedEndpoints
+        - expiresAt
+        - status
+        - createdAt
+
+    CreateSessionBody:
+      type: object
+      properties:
+        agentId:
+          type: string
+        maxSpendUsdc:
+          type: number
+          description: Maximum USDC spend limit for this session
+        durationMinutes:
+          type: integer
+          description: Session lifetime in minutes
+        allowedEndpoints:
+          type: array
+          items:
+            type: string
+          description: Whitelisted service endpoints
+      required: [agentId, maxSpendUsdc, durationMinutes, allowedEndpoints]
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        endpoint:
+          type: string
+        priceUsdc:
+          type: number
+        ownerAddress:
+          type: string
+        reputationScore:
+          type: number
+        totalCalls:
+          type: integer
+        avgRating:
+          type: number
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - description
+        - category
+        - endpoint
+        - priceUsdc
+        - ownerAddress
+        - reputationScore
+        - totalCalls
+        - avgRating
+        - isActive
+        - createdAt
+
+    RegisterServiceBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        endpoint:
+          type: string
+        priceUsdc:
+          type: number
+        ownerAddress:
+          type: string
+      required: [name, description, category, endpoint, priceUsdc, ownerAddress]
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        agentId:
+          type: string
+        agentName:
+          type: string
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        sessionId:
+          type: string
+        amountUsdc:
+          type: number
+        txHash:
+          type: string
+          description: Stellar testnet transaction hash
+        status:
+          type: string
+          enum: [pending, confirmed, failed]
+        network:
+          type: string
+          enum: [testnet, mainnet]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - agentId
+        - agentName
+        - serviceId
+        - serviceName
+        - amountUsdc
+        - txHash
+        - status
+        - network
+        - createdAt
+
+    Rating:
+      type: object
+      properties:
+        id:
+          type: string
+        agentId:
+          type: string
+        agentName:
+          type: string
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        paymentId:
+          type: string
+        stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        reputationDelta:
+          type: number
+          description: How much the agent's reputation changed
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - agentId
+        - agentName
+        - serviceId
+        - serviceName
+        - paymentId
+        - stars
+        - createdAt
+
+    SubmitRatingBody:
+      type: object
+      properties:
+        agentId:
+          type: string
+        serviceId:
+          type: string
+        paymentId:
+          type: string
+        stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+      required: [agentId, serviceId, paymentId, stars]
+
+    PaymentRequiredResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        x402Version:
+          type: integer
+        accepts:
+          type: array
+          items:
+            type: object
+            properties:
+              scheme:
+                type: string
+              network:
+                type: string
+              maxAmountRequired:
+                type: string
+              resource:
+                type: string
+              description:
+                type: string
+              mimeType:
+                type: string
+              payTo:
+                type: string
+              maxTimeoutSeconds:
+                type: integer
+              asset:
+                type: string
+              extra:
+                type: object
+            required: [scheme, network, maxAmountRequired, resource, payTo, asset]
+      required: [error, x402Version, accepts]
+
+    DemoRunResult:
+      type: object
+      properties:
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step:
+                type: string
+              status:
+                type: string
+                enum: [success, failed, skipped]
+              message:
+                type: string
+              data:
+                type: object
+            required: [step, status, message]
+        finalReputationScore:
+          type: number
+        paymentId:
+          type: string
+        ratingId:
+          type: string
+        txHash:
+          type: string
+        summary:
+          type: string
+      required: [steps, finalReputationScore, summary]
