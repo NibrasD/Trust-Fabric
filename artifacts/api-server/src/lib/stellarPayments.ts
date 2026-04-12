@@ -67,9 +67,29 @@ export function getAssetDisplayName(): string {
 }
 
 // Trust Fabric protocol fee receiver (10% of each payment)
-export const PROTOCOL_FEE_ADDRESS =
+// This must be a valid 56-char Stellar public key.
+// If unset or invalid, the fee is redirected to the service provider (no-op for demo).
+const _RAW_FEE_ADDRESS =
   process.env.PROTOCOL_FEE_ADDRESS ??
   "GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ";
+
+// Validate the address — if invalid (e.g. 55-char default), use null
+// and let buildMppPaymentTransaction handle gracefully
+function _validateFeeAddress(addr: string): string | null {
+  try {
+    return StrKey.isValidEd25519PublicKey(addr) ? addr : null;
+  } catch {
+    return null;
+  }
+}
+
+const _validatedFeeAddress = _validateFeeAddress(_RAW_FEE_ADDRESS);
+
+/** Valid protocol fee address or null if unconfigured */
+export const PROTOCOL_FEE_ADDRESS: string | null = _validatedFeeAddress;
+
+/** Display string for UI */
+export const PROTOCOL_FEE_ADDRESS_DISPLAY = _RAW_FEE_ADDRESS;
 
 // Fraction of payment taken as protocol fee (for MPP-style split)
 export const PROTOCOL_FEE_FRACTION = 0.1;
@@ -126,7 +146,7 @@ export function buildX402Challenge(params: {
           version: "1.0",
           paymentAsset: assetStr,
           mppEnabled: true,
-          protocolFeeAddress: PROTOCOL_FEE_ADDRESS,
+          protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? PROTOCOL_FEE_ADDRESS_DISPLAY,
           protocolFeeFraction: PROTOCOL_FEE_FRACTION,
         },
       },
@@ -148,8 +168,9 @@ export interface PaymentVerification {
 }
 
 /**
- * Verify a Stellar payment transaction via Horizon.
+ * Verify a Stellar payment transaction via Horizon REST API.
  *
+ * Uses direct fetch to Horizon (more reliable than the SDK wrapper).
  * Checks:
  * - Transaction exists and is successful on Stellar Testnet
  * - Contains a payment to the expected payTo address
@@ -164,58 +185,83 @@ export async function verifyPayment(params: {
 }): Promise<PaymentVerification> {
   const { txHash, expectedPayTo, expectedMinAmountUsdc, maxAgeSeconds = 300 } = params;
   const asset = getPaymentAsset();
+  const hash = txHash.toLowerCase();
 
   try {
-    const tx = await server.transactions().transaction(txHash).call();
+    // Use direct fetch to Horizon REST API (SDK .transaction() returns 400 for some SDK versions)
+    const txResp = await fetch(`${HORIZON_URL}/transactions/${hash}`);
+    if (!txResp.ok) {
+      const body = await txResp.text().catch(() => txResp.statusText);
+      return { valid: false, txHash: hash, error: `Horizon lookup failed: ${txResp.status} ${body}` };
+    }
+    const tx = await txResp.json() as {
+      successful: boolean;
+      created_at: string;
+      memo_type?: string;
+      memo?: string;
+    };
 
     if (!tx.successful) {
-      return { valid: false, txHash, error: "Transaction failed on-chain" };
+      return { valid: false, txHash: hash, error: "Transaction failed on-chain" };
     }
 
     const ageSeconds = (Date.now() - new Date(tx.created_at).getTime()) / 1000;
     if (ageSeconds > maxAgeSeconds) {
       return {
         valid: false,
-        txHash,
+        txHash: hash,
         error: `Transaction too old (${Math.round(ageSeconds)}s > ${maxAgeSeconds}s)`,
       };
     }
 
-    const operations = await server.operations().forTransaction(txHash).call();
+    const opsResp = await fetch(`${HORIZON_URL}/transactions/${hash}/operations`);
+    if (!opsResp.ok) {
+      return { valid: false, txHash: hash, error: "Could not load operations from Horizon" };
+    }
+    const opsData = await opsResp.json() as {
+      _embedded: { records: Array<{
+        type: string;
+        to?: string;
+        from?: string;
+        amount?: string;
+        asset_type?: string;
+        asset_code?: string;
+        asset_issuer?: string;
+      }> };
+    };
+    const operations = opsData._embedded?.records ?? [];
 
-    for (const op of operations.records) {
+    for (const op of operations) {
       if (op.type === "payment") {
-        const paymentOp = op as Horizon.HorizonApi.PaymentOperationResponse;
-
         // Check destination
-        if (paymentOp.to !== expectedPayTo) continue;
+        if (op.to !== expectedPayTo) continue;
 
         // Check asset
         const isNative = asset.isNative();
         const isMatchingAsset = isNative
-          ? paymentOp.asset_type === "native"
-          : paymentOp.asset_type !== "native" &&
-            paymentOp.asset_code === asset.getCode() &&
-            paymentOp.asset_issuer === asset.getIssuer();
+          ? op.asset_type === "native"
+          : op.asset_type !== "native" &&
+            op.asset_code === asset.getCode() &&
+            op.asset_issuer === asset.getIssuer();
 
         if (!isMatchingAsset) continue;
 
-        const amount = parseFloat(paymentOp.amount);
+        const amount = parseFloat(op.amount ?? "0");
         if (amount < expectedMinAmountUsdc) {
           return {
             valid: false,
-            txHash,
+            txHash: hash,
             error: `Insufficient payment: ${amount} ${getAssetDisplayName()} < ${expectedMinAmountUsdc} required`,
           };
         }
 
         return {
           valid: true,
-          txHash,
-          fromAddress: paymentOp.from,
-          toAddress: paymentOp.to,
-          amount: paymentOp.amount,
-          assetCode: isNative ? "XLM" : paymentOp.asset_code,
+          txHash: hash,
+          fromAddress: op.from,
+          toAddress: op.to,
+          amount: op.amount,
+          assetCode: isNative ? "XLM" : op.asset_code,
           memo: tx.memo_type === "text" ? tx.memo : undefined,
         };
       }
@@ -250,21 +296,29 @@ export async function buildMppPaymentTransaction(params: {
   serviceAddress: string;
   amountUsdc: number;
   memo?: string;
-}): Promise<string> {
+}): Promise<{ xdr: string; serviceAmount: string; feeAmount: string; hasFeeRecipient: boolean }> {
   const { fromKeypair, serviceAddress, amountUsdc, memo } = params;
   const asset = getPaymentAsset();
 
   const sourceAccount = await server.loadAccount(fromKeypair.publicKey());
 
-  const serviceAmount = (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7);
-  const feeAmount = (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7);
+  const hasFeeRecipient =
+    PROTOCOL_FEE_ADDRESS !== null &&
+    PROTOCOL_FEE_ADDRESS !== serviceAddress;
+
+  const serviceAmount = hasFeeRecipient
+    ? (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7)
+    : amountUsdc.toFixed(7);
+  const feeAmount = hasFeeRecipient
+    ? (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7)
+    : "0.0000000";
 
   const builder = new TransactionBuilder(sourceAccount, {
     fee: BASE_FEE,
     networkPassphrase: STELLAR_PASSPHRASE,
   });
 
-  // Payment to service provider (90%)
+  // Main payment to service provider (90% with MPP, or 100% without fee)
   builder.addOperation(
     Operation.payment({
       destination: serviceAddress,
@@ -273,14 +327,16 @@ export async function buildMppPaymentTransaction(params: {
     })
   );
 
-  // Protocol fee (MPP-style split, 10%)
-  builder.addOperation(
-    Operation.payment({
-      destination: PROTOCOL_FEE_ADDRESS,
-      asset,
-      amount: feeAmount,
-    })
-  );
+  // Protocol fee (MPP-style split, 10%) — only if fee address is valid
+  if (hasFeeRecipient) {
+    builder.addOperation(
+      Operation.payment({
+        destination: PROTOCOL_FEE_ADDRESS!,
+        asset,
+        amount: feeAmount,
+      })
+    );
+  }
 
   if (memo) {
     builder.addMemo(Memo.text(memo.slice(0, 28)));
@@ -289,7 +345,12 @@ export async function buildMppPaymentTransaction(params: {
   const tx = builder.setTimeout(300).build();
   tx.sign(fromKeypair);
 
-  return tx.toEnvelope().toXDR("base64");
+  return {
+    xdr: tx.toEnvelope().toXDR("base64"),
+    serviceAmount,
+    feeAmount,
+    hasFeeRecipient,
+  };
 }
 
 // ── Keypair & Funding Utils ───────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sql, lte, and } from "drizzle-orm";
 import { db, servicesTable } from "@workspace/db";
+import { Keypair } from "@stellar/stellar-sdk";
 import {
   ListServicesQueryParams,
   RegisterServiceBody,
@@ -14,10 +15,17 @@ import {
 
 const router: IRouter = Router();
 
-// Service receiving address for the AI Summarizer
-// In production this would be per-service; here we use the protocol fee address as demo
-const SUMMARIZER_PAYTO =
-  process.env.SUMMARIZER_ADDRESS ?? PROTOCOL_FEE_ADDRESS;
+// Service receiving address for the AI Summarizer.
+// Priority: env SUMMARIZER_ADDRESS → valid PROTOCOL_FEE_ADDRESS → deterministic demo keypair
+function getSummarizerPayTo(): string {
+  const envAddr = process.env.SUMMARIZER_ADDRESS;
+  if (envAddr && isValidStellarAddress(envAddr)) return envAddr;
+  if (PROTOCOL_FEE_ADDRESS) return PROTOCOL_FEE_ADDRESS;
+  // Derive a deterministic demo address (never used for real funds — just for the challenge spec)
+  return Keypair.fromRawEd25519Seed(Buffer.alloc(32, 1)).publicKey();
+}
+
+const SUMMARIZER_PAYTO = getSummarizerPayTo();
 
 // Whether to verify payments on Horizon (set STELLAR_VERIFY_ONCHAIN=true in prod)
 const VERIFY_ONCHAIN = process.env.STELLAR_VERIFY_ONCHAIN === "true";

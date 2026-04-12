@@ -21,6 +21,7 @@ import {
   getAssetDisplayName,
   HORIZON_URL,
   PROTOCOL_FEE_ADDRESS,
+  PROTOCOL_FEE_ADDRESS_DISPLAY,
   PROTOCOL_FEE_FRACTION,
   server,
 } from "../lib/stellarPayments.js";
@@ -41,7 +42,8 @@ router.get("/stellar/network", async (_req, res): Promise<void> => {
       horizonUrl: HORIZON_URL,
       paymentAsset: assetStr,
       assetName: getAssetDisplayName(),
-      protocolFeeAddress: PROTOCOL_FEE_ADDRESS,
+      protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? PROTOCOL_FEE_ADDRESS_DISPLAY,
+      protocolFeeAddressValid: PROTOCOL_FEE_ADDRESS !== null,
       protocolFeeFraction: PROTOCOL_FEE_FRACTION,
       horizonConnected: true,
       mppEnabled: true,
@@ -52,7 +54,8 @@ router.get("/stellar/network", async (_req, res): Promise<void> => {
       horizonUrl: HORIZON_URL,
       paymentAsset: assetStr,
       assetName: getAssetDisplayName(),
-      protocolFeeAddress: PROTOCOL_FEE_ADDRESS,
+      protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? PROTOCOL_FEE_ADDRESS_DISPLAY,
+      protocolFeeAddressValid: PROTOCOL_FEE_ADDRESS !== null,
       protocolFeeFraction: PROTOCOL_FEE_FRACTION,
       horizonConnected: false,
       mppEnabled: true,
@@ -161,7 +164,7 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
 
   try {
     const keypair = Keypair.fromSecret(fromSecretKey);
-    const xdr = await buildMppPaymentTransaction({
+    const result = await buildMppPaymentTransaction({
       fromKeypair: keypair,
       serviceAddress: toAddress,
       amountUsdc,
@@ -169,14 +172,15 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
     });
 
     res.json({
-      xdr,
+      xdr: result.xdr,
       fromAddress: keypair.publicKey(),
       toAddress,
       amountUsdc,
       mppSplit: {
-        serviceAmount: (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7),
-        protocolFee: (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7),
-        protocolFeeAddress: PROTOCOL_FEE_ADDRESS,
+        serviceAmount: result.serviceAmount,
+        protocolFee: result.feeAmount,
+        protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? "(no valid fee address configured)",
+        hasFeeRecipient: result.hasFeeRecipient,
       },
       network: "testnet",
       instructions: "Sign and submit this XDR to Stellar Testnet, then use the tx hash as X-PAYMENT header",
