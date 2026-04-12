@@ -9,6 +9,7 @@ export const paymentsTable = pgTable("payments", {
   sessionId: integer("session_id"),
   amountUsdc: numeric("amount_usdc", { precision: 18, scale: 6 }).notNull(),
   txHash: text("tx_hash").notNull(),
+  fromAddress: text("from_address"),
   status: text("status").notNull().default("confirmed"),
   network: text("network").notNull().default("testnet"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -5,9 +5,19 @@
 A trust and permission layer for autonomous AI agents on Stellar. Built for the Stellar Agents x402 Hackathon.
 
 Enables AI agents to:
-- Discover and pay for services using x402 micropayments (HTTP 402 Payment Required)
+- Discover and pay for services using real x402 micropayments (HTTP 402 Payment Required, verified on Horizon)
 - Operate with scoped, time-limited, spend-capped permissions via Soroban smart contracts
 - Build and maintain an on-chain reputation score based on payment history and star ratings
+- Execute MPP-style split payments (90% service + 10% protocol fee) via native Stellar SDK
+
+## Real Stellar Integration
+
+- **x402 Middleware**: Custom `x402Middleware.ts` implements the full x402 HTTP payment standard for Stellar
+- **MPP Payments**: `buildMppPaymentTransaction()` creates atomic multi-operation transactions splitting payments
+- **Horizon Verification**: `verifyPayment()` checks Stellar Testnet via Horizon API (enabled via `STELLAR_VERIFY_ONCHAIN=true`)
+- **Payment Asset**: Native XLM by default (no trustline needed); set `USDC_ISSUER` for USDC
+- **Friendbot**: `createAndFundTestnetAccount()` creates and funds real Stellar Testnet keypairs
+- **Demo Agent**: `examples/demo-agent/agent.ts` shows full x402 cycle with `--real-payment` flag for real Stellar tx
 
 ## Project Structure
 

@@ -21,6 +21,7 @@ async function formatPayment(p: typeof paymentsTable.$inferSelect) {
     sessionId: p.sessionId ? String(p.sessionId) : undefined,
     amountUsdc: Number(p.amountUsdc),
     txHash: p.txHash,
+    fromAddress: p.fromAddress ?? null,
     status: p.status,
     network: p.network,
     createdAt: p.createdAt.toISOString(),

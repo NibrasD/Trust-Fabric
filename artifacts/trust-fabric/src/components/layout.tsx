@@ -7,7 +7,8 @@ import {
   Activity, 
   FlaskConical, 
   Star,
-  ActivitySquare
+  ActivitySquare,
+  Telescope
 } from "lucide-react";
 import { useHealthCheck } from "@workspace/api-client-react";
 
@@ -22,6 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { name: "Services", href: "/services", icon: ServerCog },
     { name: "Payments", href: "/payments", icon: Activity },
     { name: "Demo Lab", href: "/demo", icon: FlaskConical },
+    { name: "Stellar Lab", href: "/stellar", icon: Telescope },
     { name: "Rate", href: "/rate", icon: Star },
   ];
 

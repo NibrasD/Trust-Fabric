@@ -16,6 +16,7 @@ import ServicesList from "@/pages/services/index";
 import NewService from "@/pages/services/new";
 import PaymentsList from "@/pages/payments/index";
 import DemoLab from "@/pages/demo/index";
+import StellarLab from "@/pages/stellar/index";
 import SubmitRating from "@/pages/rate/index";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/services/new" component={NewService} />
         <Route path="/payments" component={PaymentsList} />
         <Route path="/demo" component={DemoLab} />
+        <Route path="/stellar" component={StellarLab} />
         <Route path="/rate" component={SubmitRating} />
         <Route component={NotFound} />
       </Switch>

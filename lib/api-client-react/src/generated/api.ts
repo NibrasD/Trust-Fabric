@@ -19,6 +19,8 @@ import type {
 import type {
   Agent,
   AgentsSummary,
+  BuildPaymentBody,
+  BuildPaymentResponse,
   CreateSessionBody,
   DemoRunResult,
   ErrorResponse,
@@ -40,13 +42,20 @@ import type {
   PaidSummarizeBody,
   Payment,
   PaymentRequiredResponse,
+  PaymentVerificationResponse,
   Rating,
   RegisterAgentBody,
   RegisterServiceBody,
   RunDemoAgentBody,
   Service,
   Session,
+  StellarAccountCreated,
+  StellarBalanceResponse,
+  StellarNetworkInfo,
+  SubmitPaymentResponse,
   SubmitRatingBody,
+  SubmitStellarPaymentBody,
+  VerifyStellarPaymentParams,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1825,3 +1834,540 @@ export const useRunDemoAgent = <
 > => {
   return useMutation(getRunDemoAgentMutationOptions(options));
 };
+
+/**
+ * @summary Stellar network info (Horizon URL, USDC asset, MPP config)
+ */
+export const getGetStellarNetworkUrl = () => {
+  return `/api/stellar/network`;
+};
+
+export const getStellarNetwork = async (
+  options?: RequestInit,
+): Promise<StellarNetworkInfo> => {
+  return customFetch<StellarNetworkInfo>(getGetStellarNetworkUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStellarNetworkQueryKey = () => {
+  return [`/api/stellar/network`] as const;
+};
+
+export const getGetStellarNetworkQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStellarNetwork>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStellarNetwork>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetStellarNetworkQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStellarNetwork>>
+  > = ({ signal }) => getStellarNetwork({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStellarNetwork>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStellarNetworkQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStellarNetwork>>
+>;
+export type GetStellarNetworkQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Stellar network info (Horizon URL, USDC asset, MPP config)
+ */
+
+export function useGetStellarNetwork<
+  TData = Awaited<ReturnType<typeof getStellarNetwork>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStellarNetwork>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStellarNetworkQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create and fund a new Stellar Testnet account via Friendbot, add USDC trustline
+ */
+export const getCreateStellarAccountUrl = () => {
+  return `/api/stellar/account/create`;
+};
+
+export const createStellarAccount = async (
+  options?: RequestInit,
+): Promise<StellarAccountCreated> => {
+  return customFetch<StellarAccountCreated>(getCreateStellarAccountUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCreateStellarAccountMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createStellarAccount>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createStellarAccount>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["createStellarAccount"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createStellarAccount>>,
+    void
+  > = () => {
+    return createStellarAccount(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateStellarAccountMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createStellarAccount>>
+>;
+
+export type CreateStellarAccountMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create and fund a new Stellar Testnet account via Friendbot, add USDC trustline
+ */
+export const useCreateStellarAccount = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createStellarAccount>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createStellarAccount>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCreateStellarAccountMutationOptions(options));
+};
+
+/**
+ * @summary Get XLM and USDC balance for a Stellar address
+ */
+export const getGetStellarBalanceUrl = (address: string) => {
+  return `/api/stellar/account/${address}/balance`;
+};
+
+export const getStellarBalance = async (
+  address: string,
+  options?: RequestInit,
+): Promise<StellarBalanceResponse> => {
+  return customFetch<StellarBalanceResponse>(getGetStellarBalanceUrl(address), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStellarBalanceQueryKey = (address: string) => {
+  return [`/api/stellar/account/${address}/balance`] as const;
+};
+
+export const getGetStellarBalanceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStellarBalance>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  address: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStellarBalance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStellarBalanceQueryKey(address);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStellarBalance>>
+  > = ({ signal }) => getStellarBalance(address, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!address,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStellarBalance>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStellarBalanceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStellarBalance>>
+>;
+export type GetStellarBalanceQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get XLM and USDC balance for a Stellar address
+ */
+
+export function useGetStellarBalance<
+  TData = Awaited<ReturnType<typeof getStellarBalance>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  address: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStellarBalance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStellarBalanceQueryOptions(address, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Build an MPP-style split payment XDR (90% service, 10% protocol fee)
+ */
+export const getBuildStellarPaymentUrl = () => {
+  return `/api/stellar/payment/build`;
+};
+
+export const buildStellarPayment = async (
+  buildPaymentBody: BuildPaymentBody,
+  options?: RequestInit,
+): Promise<BuildPaymentResponse> => {
+  return customFetch<BuildPaymentResponse>(getBuildStellarPaymentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(buildPaymentBody),
+  });
+};
+
+export const getBuildStellarPaymentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof buildStellarPayment>>,
+    TError,
+    { data: BodyType<BuildPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof buildStellarPayment>>,
+  TError,
+  { data: BodyType<BuildPaymentBody> },
+  TContext
+> => {
+  const mutationKey = ["buildStellarPayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof buildStellarPayment>>,
+    { data: BodyType<BuildPaymentBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return buildStellarPayment(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BuildStellarPaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof buildStellarPayment>>
+>;
+export type BuildStellarPaymentMutationBody = BodyType<BuildPaymentBody>;
+export type BuildStellarPaymentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Build an MPP-style split payment XDR (90% service, 10% protocol fee)
+ */
+export const useBuildStellarPayment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof buildStellarPayment>>,
+    TError,
+    { data: BodyType<BuildPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof buildStellarPayment>>,
+  TError,
+  { data: BodyType<BuildPaymentBody> },
+  TContext
+> => {
+  return useMutation(getBuildStellarPaymentMutationOptions(options));
+};
+
+/**
+ * @summary Submit a signed XDR transaction to Stellar Testnet
+ */
+export const getSubmitStellarPaymentUrl = () => {
+  return `/api/stellar/payment/submit`;
+};
+
+export const submitStellarPayment = async (
+  submitStellarPaymentBody: SubmitStellarPaymentBody,
+  options?: RequestInit,
+): Promise<SubmitPaymentResponse> => {
+  return customFetch<SubmitPaymentResponse>(getSubmitStellarPaymentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitStellarPaymentBody),
+  });
+};
+
+export const getSubmitStellarPaymentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitStellarPayment>>,
+    TError,
+    { data: BodyType<SubmitStellarPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitStellarPayment>>,
+  TError,
+  { data: BodyType<SubmitStellarPaymentBody> },
+  TContext
+> => {
+  const mutationKey = ["submitStellarPayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitStellarPayment>>,
+    { data: BodyType<SubmitStellarPaymentBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitStellarPayment(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitStellarPaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitStellarPayment>>
+>;
+export type SubmitStellarPaymentMutationBody =
+  BodyType<SubmitStellarPaymentBody>;
+export type SubmitStellarPaymentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a signed XDR transaction to Stellar Testnet
+ */
+export const useSubmitStellarPayment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitStellarPayment>>,
+    TError,
+    { data: BodyType<SubmitStellarPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitStellarPayment>>,
+  TError,
+  { data: BodyType<SubmitStellarPaymentBody> },
+  TContext
+> => {
+  return useMutation(getSubmitStellarPaymentMutationOptions(options));
+};
+
+/**
+ * @summary Verify a Stellar USDC payment transaction on Horizon
+ */
+export const getVerifyStellarPaymentUrl = (
+  txHash: string,
+  params: VerifyStellarPaymentParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/stellar/payment/verify/${txHash}?${stringifiedParams}`
+    : `/api/stellar/payment/verify/${txHash}`;
+};
+
+export const verifyStellarPayment = async (
+  txHash: string,
+  params: VerifyStellarPaymentParams,
+  options?: RequestInit,
+): Promise<PaymentVerificationResponse> => {
+  return customFetch<PaymentVerificationResponse>(
+    getVerifyStellarPaymentUrl(txHash, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getVerifyStellarPaymentQueryKey = (
+  txHash: string,
+  params?: VerifyStellarPaymentParams,
+) => {
+  return [
+    `/api/stellar/payment/verify/${txHash}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getVerifyStellarPaymentQueryOptions = <
+  TData = Awaited<ReturnType<typeof verifyStellarPayment>>,
+  TError = ErrorType<unknown>,
+>(
+  txHash: string,
+  params: VerifyStellarPaymentParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof verifyStellarPayment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getVerifyStellarPaymentQueryKey(txHash, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof verifyStellarPayment>>
+  > = ({ signal }) =>
+    verifyStellarPayment(txHash, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!txHash,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof verifyStellarPayment>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type VerifyStellarPaymentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof verifyStellarPayment>>
+>;
+export type VerifyStellarPaymentQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Verify a Stellar USDC payment transaction on Horizon
+ */
+
+export function useVerifyStellarPayment<
+  TData = Awaited<ReturnType<typeof verifyStellarPayment>>,
+  TError = ErrorType<unknown>,
+>(
+  txHash: string,
+  params: VerifyStellarPaymentParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof verifyStellarPayment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getVerifyStellarPaymentQueryOptions(
+    txHash,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

@@ -2,7 +2,11 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, agentsTable, servicesTable, paymentsTable, ratingsTable } from "@workspace/db";
 import { RunDemoAgentBody } from "@workspace/api-zod";
-import { generateStellarTxHash } from "../lib/stellarUtils.js";
+import {
+  buildX402Challenge,
+  PROTOCOL_FEE_ADDRESS,
+  PROTOCOL_FEE_FRACTION,
+} from "../lib/stellarPayments.js";
 
 const router: IRouter = Router();
 
@@ -51,20 +55,37 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     },
   });
 
+  const x402Challenge = buildX402Challenge({
+    serviceAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS,
+    amountUsdc: Number(svc.priceUsdc),
+    resource: svc.endpoint,
+    description: `${svc.name} — ${svc.priceUsdc} USDC per request`,
+  });
+
   steps.push({
     step: "x402_request",
     status: "success",
     message: `Agent sent HTTP request to ${svc.endpoint} — received 402 Payment Required`,
     data: {
       httpStatus: 402,
-      x402Version: 1,
+      x402Version: x402Challenge.x402Version,
       requiredAmount: `${svc.priceUsdc} USDC`,
       network: "stellar-testnet",
+      payTo: x402Challenge.accepts[0]?.payTo ?? svc.ownerAddress,
+      asset: x402Challenge.accepts[0]?.asset,
+      mppEnabled: x402Challenge.accepts[0]?.extra?.mppEnabled,
+      protocolFeeAddress: x402Challenge.accepts[0]?.extra?.protocolFeeAddress,
+      protocolFeeFraction: x402Challenge.accepts[0]?.extra?.protocolFeeFraction,
     },
   });
 
-  const txHash = generateStellarTxHash();
+  // In demo mode, we simulate the Stellar transaction with a realistic hash.
+  // In production, the agent would sign and submit a real MPP transaction.
   const amountUsdc = Number(svc.priceUsdc);
+  const txHash = `${Buffer.from(Date.now().toString()).toString("hex").slice(0, 32)}${Math.random().toString(16).slice(2, 34)}`;
+
+  const serviceAmount = (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7);
+  const feeAmount = (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7);
 
   const [payment] = await db
     .insert(paymentsTable)
@@ -73,6 +94,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       serviceId: Number(serviceId),
       amountUsdc: String(amountUsdc),
       txHash,
+      fromAddress: agent.stellarAddress,
       status: "confirmed",
       network: "testnet",
     })
@@ -94,11 +116,16 @@ router.post("/demo/run", async (req, res): Promise<void> => {
   steps.push({
     step: "payment_confirmed",
     status: "success",
-    message: `x402 payment of ${amountUsdc} USDC confirmed on Stellar Testnet`,
+    message: `MPP payment of ${amountUsdc} USDC split and confirmed on Stellar Testnet`,
     data: {
       txHash,
-      amountUsdc,
+      totalUsdc: amountUsdc,
+      serviceAmount,
+      protocolFee: feeAmount,
+      fromAddress: agent.stellarAddress,
+      toAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS,
       network: "testnet",
+      verifiedOnChain: false,
       stellarExplorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
     },
   });

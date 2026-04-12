@@ -6,8 +6,21 @@ import {
   RegisterServiceBody,
   GetServiceParams,
 } from "@workspace/api-zod";
+import { x402Middleware, type X402Request } from "../lib/x402Middleware.js";
+import {
+  PROTOCOL_FEE_ADDRESS,
+  isValidStellarAddress,
+} from "../lib/stellarPayments.js";
 
 const router: IRouter = Router();
+
+// Service receiving address for the AI Summarizer
+// In production this would be per-service; here we use the protocol fee address as demo
+const SUMMARIZER_PAYTO =
+  process.env.SUMMARIZER_ADDRESS ?? PROTOCOL_FEE_ADDRESS;
+
+// Whether to verify payments on Horizon (set STELLAR_VERIFY_ONCHAIN=true in prod)
+const VERIFY_ONCHAIN = process.env.STELLAR_VERIFY_ONCHAIN === "true";
 
 function formatService(s: typeof servicesTable.$inferSelect) {
   return {
@@ -86,93 +99,130 @@ router.get("/services/categories/counts", async (_req, res): Promise<void> => {
   res.json({ categories: rows });
 });
 
+/**
+ * GET /services/paid/summarize
+ * Returns the x402 payment challenge (402 Payment Required).
+ * Clients should POST with X-PAYMENT header after submitting Stellar tx.
+ */
 router.get("/services/paid/summarize", async (req, res): Promise<void> => {
-  res.status(402).json({
-    error: "Payment Required",
-    x402Version: 1,
-    accepts: [
-      {
-        scheme: "exact",
-        network: "stellar-testnet",
-        maxAmountRequired: "0.10",
-        resource: `${req.protocol}://${req.get("host")}/api/services/paid/summarize`,
-        description: "AI Summarizer — 0.10 USDC per request",
-        mimeType: "application/json",
-        payTo: "GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ",
-        maxTimeoutSeconds: 60,
-        asset: "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA",
-        extra: { name: "AI Summarizer", version: "1.0" },
-      },
-    ],
-  });
+  const { buildX402Challenge } = await import("../lib/stellarPayments.js");
+  res.status(402).json(
+    buildX402Challenge({
+      serviceAddress: SUMMARIZER_PAYTO,
+      amountUsdc: 0.1,
+      resource: `${req.protocol}://${req.get("host")}/api/services/paid/summarize`,
+      description: "AI Summarizer — 0.10 USDC per request (MPP: 90% service, 10% protocol fee)",
+    })
+  );
 });
 
-router.post("/services/paid/summarize", async (req, res): Promise<void> => {
-  const { text, agentId } = req.body as { text?: string; agentId?: string; sessionToken?: string };
+/**
+ * POST /services/paid/summarize
+ * x402-protected AI text summarization endpoint.
+ *
+ * Requires X-PAYMENT header containing a Stellar transaction hash.
+ * The middleware verifies the payment on Horizon before allowing access.
+ *
+ * Flow:
+ *   1. Agent submits 0.10 USDC payment to SUMMARIZER_PAYTO on Stellar Testnet
+ *   2. Agent includes tx hash in X-PAYMENT header
+ *   3. Middleware verifies the payment via Horizon API
+ *   4. On success, this handler summarizes the text and records the payment
+ *
+ * In development (STELLAR_VERIFY_ONCHAIN != "true"), any tx hash is accepted.
+ */
+router.post(
+  "/services/paid/summarize",
+  x402Middleware({
+    payToAddress: SUMMARIZER_PAYTO,
+    amountUsdc: 0.1,
+    description: "AI Summarizer — 0.10 USDC per request",
+    verifyOnChain: VERIFY_ONCHAIN,
+  }),
+  async (req, res): Promise<void> => {
+    const x402Req = req as X402Request;
+    const { text, agentId } = req.body as {
+      text?: string;
+      agentId?: string;
+      sessionToken?: string;
+    };
 
-  if (!text || !agentId) {
-    res.status(400).json({ error: "bad_request", message: "text and agentId are required" });
-    return;
-  }
+    if (!text || !agentId) {
+      res.status(400).json({ error: "bad_request", message: "text and agentId are required" });
+      return;
+    }
 
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    const wordCount = words.length;
 
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 10);
-  const summary =
-    sentences.length > 0
-      ? sentences.slice(0, Math.min(2, sentences.length)).join(". ").trim() + "."
-      : words.slice(0, Math.min(30, words.length)).join(" ") + "...";
+    const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 10);
+    const summary =
+      sentences.length > 0
+        ? sentences.slice(0, Math.min(2, sentences.length)).join(". ").trim() + "."
+        : words.slice(0, Math.min(30, words.length)).join(" ") + "...";
 
-  const { paymentsTable, agentsTable } = await import("@workspace/db");
-  const { generateStellarTxHash } = await import("../lib/stellarUtils.js");
+    const { paymentsTable, agentsTable } = await import("@workspace/db");
 
-  const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, Number(agentId)));
-  if (!agent) {
-    res.status(404).json({ error: "not_found", message: "Agent not found" });
-    return;
-  }
+    const [agent] = await db
+      .select()
+      .from(agentsTable)
+      .where(eq(agentsTable.id, Number(agentId)));
 
-  const [svc] = await db
-    .select()
-    .from(servicesTable)
-    .where(eq(servicesTable.name, "AI Summarizer"));
+    if (!agent) {
+      res.status(404).json({ error: "not_found", message: "Agent not found" });
+      return;
+    }
 
-  const serviceId = svc?.id ?? 1;
-  const txHash = generateStellarTxHash();
+    const [svc] = await db
+      .select()
+      .from(servicesTable)
+      .where(eq(servicesTable.name, "AI Summarizer"));
 
-  const [payment] = await db
-    .insert(paymentsTable)
-    .values({
-      agentId: Number(agentId),
-      serviceId,
-      amountUsdc: "0.10",
+    const serviceId = svc?.id ?? 1;
+
+    // Use the verified tx hash from x402 middleware (or "dev_mode" fallback)
+    const txHash = x402Req.x402Payment?.txHash ?? `dev_${Date.now().toString(16)}`;
+    const fromAddress = x402Req.x402Payment?.fromAddress;
+    const verifiedOnChain = x402Req.x402Payment?.verifiedOnChain ?? false;
+
+    const [payment] = await db
+      .insert(paymentsTable)
+      .values({
+        agentId: Number(agentId),
+        serviceId,
+        amountUsdc: "0.10",
+        txHash,
+        status: "confirmed",
+        network: "testnet",
+        ...(fromAddress && isValidStellarAddress(fromAddress) ? { fromAddress } : {}),
+      })
+      .returning();
+
+    await db
+      .update(agentsTable)
+      .set({
+        totalTransactions: agent.totalTransactions + 1,
+        totalSpentUsdc: String(Number(agent.totalSpentUsdc) + 0.1),
+      })
+      .where(eq(agentsTable.id, agent.id));
+
+    await db
+      .update(servicesTable)
+      .set({ totalCalls: (svc?.totalCalls ?? 0) + 1 })
+      .where(eq(servicesTable.id, serviceId));
+
+    res.json({
+      summary,
+      wordCount,
+      paymentRecorded: true,
+      paymentId: String(payment!.id),
       txHash,
-      status: "confirmed",
-      network: "testnet",
-    })
-    .returning();
-
-  await db
-    .update(agentsTable)
-    .set({
-      totalTransactions: agent.totalTransactions + 1,
-      totalSpentUsdc: String(Number(agent.totalSpentUsdc) + 0.1),
-    })
-    .where(eq(agentsTable.id, agent.id));
-
-  await db
-    .update(servicesTable)
-    .set({ totalCalls: (svc?.totalCalls ?? 0) + 1 })
-    .where(eq(servicesTable.id, serviceId));
-
-  res.json({
-    summary,
-    wordCount,
-    paymentRecorded: true,
-    paymentId: String(payment!.id),
-  });
-});
+      verifiedOnChain,
+      mppEnabled: true,
+      payTo: SUMMARIZER_PAYTO,
+    });
+  }
+);
 
 router.get("/services/:serviceId", async (req, res): Promise<void> => {
   const params = GetServiceParams.safeParse(req.params);

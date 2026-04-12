@@ -209,6 +209,88 @@ export interface DemoRunResult {
   summary: string;
 }
 
+export interface StellarNetworkInfo {
+  network: string;
+  horizonUrl: string;
+  usdcAsset: string;
+  protocolFeeAddress: string;
+  protocolFeeFraction: number;
+  horizonVersion?: string;
+  mppEnabled: boolean;
+}
+
+export type StellarAccountCreatedBalances = {
+  xlm: string;
+  usdc: string;
+};
+
+export interface StellarAccountCreated {
+  publicKey: string;
+  secretKey: string;
+  network: string;
+  friendbotFunded: boolean;
+  usdcTrustlineAdded: boolean;
+  trustlineTxHash?: string | null;
+  balances: StellarAccountCreatedBalances;
+  horizonUrl?: string;
+  warning: string;
+}
+
+export type StellarBalanceResponseBalances = {
+  xlm: string;
+  usdc: string;
+};
+
+export interface StellarBalanceResponse {
+  address: string;
+  network: string;
+  balances: StellarBalanceResponseBalances;
+  horizonUrl?: string;
+}
+
+export interface BuildPaymentBody {
+  fromSecretKey: string;
+  toAddress: string;
+  amountUsdc: number;
+  memo?: string;
+}
+
+export type BuildPaymentResponseMppSplit = {
+  serviceAmount: string;
+  protocolFee: string;
+  protocolFeeAddress: string;
+};
+
+export interface BuildPaymentResponse {
+  xdr: string;
+  fromAddress: string;
+  toAddress: string;
+  amountUsdc: number;
+  mppSplit: BuildPaymentResponseMppSplit;
+  network: string;
+  instructions?: string;
+}
+
+export interface SubmitPaymentResponse {
+  txHash: string;
+  ledger?: number;
+  successful: boolean;
+  explorerUrl?: string;
+  nextStep?: string;
+}
+
+export interface PaymentVerificationResponse {
+  valid: boolean;
+  txHash: string;
+  fromAddress?: string;
+  toAddress?: string;
+  amount?: string;
+  assetCode?: string;
+  memo?: string;
+  error?: string;
+  explorerUrl?: string;
+}
+
 export type ListAgentsParams = {
   limit?: number;
   offset?: number;
@@ -310,4 +392,13 @@ export type RunDemoAgentBody = {
   agentId: string;
   serviceId: string;
   textToSummarize?: string;
+};
+
+export type SubmitStellarPaymentBody = {
+  xdr: string;
+};
+
+export type VerifyStellarPaymentParams = {
+  payTo: string;
+  minAmount: string;
 };

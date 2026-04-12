@@ -22,6 +22,8 @@ tags:
     description: Post-transaction ratings
   - name: demo
     description: Demo agent simulation
+  - name: stellar
+    description: Stellar network integration — account creation, MPP payments, verification
 
 paths:
   /healthz:
@@ -523,6 +525,126 @@ paths:
               schema:
                 $ref: "#/components/schemas/DemoRunResult"
 
+  # ── Stellar Integration ───────────────────────────────────────────────────
+
+  /stellar/network:
+    get:
+      operationId: getStellarNetwork
+      tags: [stellar]
+      summary: Stellar network info (Horizon URL, USDC asset, MPP config)
+      responses:
+        "200":
+          description: Network info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarNetworkInfo"
+
+  /stellar/account/create:
+    post:
+      operationId: createStellarAccount
+      tags: [stellar]
+      summary: Create and fund a new Stellar Testnet account via Friendbot, add USDC trustline
+      responses:
+        "201":
+          description: Account created and funded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarAccountCreated"
+
+  /stellar/account/{address}/balance:
+    get:
+      operationId: getStellarBalance
+      tags: [stellar]
+      summary: Get XLM and USDC balance for a Stellar address
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Account balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarBalanceResponse"
+        "400":
+          description: Invalid address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stellar/payment/build:
+    post:
+      operationId: buildStellarPayment
+      tags: [stellar]
+      summary: Build an MPP-style split payment XDR (90% service, 10% protocol fee)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildPaymentBody"
+      responses:
+        "200":
+          description: Unsigned XDR transaction + MPP split breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildPaymentResponse"
+
+  /stellar/payment/submit:
+    post:
+      operationId: submitStellarPayment
+      tags: [stellar]
+      summary: Submit a signed XDR transaction to Stellar Testnet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                xdr:
+                  type: string
+              required: [xdr]
+      responses:
+        "200":
+          description: Transaction submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitPaymentResponse"
+
+  /stellar/payment/verify/{txHash}:
+    get:
+      operationId: verifyStellarPayment
+      tags: [stellar]
+      summary: Verify a Stellar USDC payment transaction on Horizon
+      parameters:
+        - in: path
+          name: txHash
+          required: true
+          schema: { type: string }
+        - in: query
+          name: payTo
+          required: true
+          schema: { type: string }
+        - in: query
+          name: minAmount
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentVerificationResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -887,3 +1009,101 @@ components:
         summary:
           type: string
       required: [steps, finalReputationScore, summary]
+
+    # ── Stellar Schemas ───────────────────────────────────────────────────────
+
+    StellarNetworkInfo:
+      type: object
+      properties:
+        network: { type: string }
+        horizonUrl: { type: string }
+        usdcAsset: { type: string }
+        protocolFeeAddress: { type: string }
+        protocolFeeFraction: { type: number }
+        horizonVersion: { type: string }
+        mppEnabled: { type: boolean }
+      required: [network, horizonUrl, usdcAsset, protocolFeeAddress, protocolFeeFraction, mppEnabled]
+
+    StellarAccountCreated:
+      type: object
+      properties:
+        publicKey: { type: string }
+        secretKey: { type: string }
+        network: { type: string }
+        friendbotFunded: { type: boolean }
+        usdcTrustlineAdded: { type: boolean }
+        trustlineTxHash: { type: string, nullable: true }
+        balances:
+          type: object
+          properties:
+            xlm: { type: string }
+            usdc: { type: string }
+          required: [xlm, usdc]
+        horizonUrl: { type: string }
+        warning: { type: string }
+      required: [publicKey, secretKey, network, friendbotFunded, usdcTrustlineAdded, balances, warning]
+
+    StellarBalanceResponse:
+      type: object
+      properties:
+        address: { type: string }
+        network: { type: string }
+        balances:
+          type: object
+          properties:
+            xlm: { type: string }
+            usdc: { type: string }
+          required: [xlm, usdc]
+        horizonUrl: { type: string }
+      required: [address, network, balances]
+
+    BuildPaymentBody:
+      type: object
+      properties:
+        fromSecretKey: { type: string }
+        toAddress: { type: string }
+        amountUsdc: { type: number }
+        memo: { type: string }
+      required: [fromSecretKey, toAddress, amountUsdc]
+
+    BuildPaymentResponse:
+      type: object
+      properties:
+        xdr: { type: string }
+        fromAddress: { type: string }
+        toAddress: { type: string }
+        amountUsdc: { type: number }
+        mppSplit:
+          type: object
+          properties:
+            serviceAmount: { type: string }
+            protocolFee: { type: string }
+            protocolFeeAddress: { type: string }
+          required: [serviceAmount, protocolFee, protocolFeeAddress]
+        network: { type: string }
+        instructions: { type: string }
+      required: [xdr, fromAddress, toAddress, amountUsdc, mppSplit, network]
+
+    SubmitPaymentResponse:
+      type: object
+      properties:
+        txHash: { type: string }
+        ledger: { type: integer }
+        successful: { type: boolean }
+        explorerUrl: { type: string }
+        nextStep: { type: string }
+      required: [txHash, successful]
+
+    PaymentVerificationResponse:
+      type: object
+      properties:
+        valid: { type: boolean }
+        txHash: { type: string }
+        fromAddress: { type: string }
+        toAddress: { type: string }
+        amount: { type: string }
+        assetCode: { type: string }
+        memo: { type: string }
+        error: { type: string }
+        explorerUrl: { type: string }
+      required: [valid, txHash]

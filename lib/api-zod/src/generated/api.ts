@@ -430,3 +430,96 @@ export const RunDemoAgentResponse = zod.object({
   txHash: zod.string().optional(),
   summary: zod.string(),
 });
+
+/**
+ * @summary Stellar network info (Horizon URL, USDC asset, MPP config)
+ */
+export const GetStellarNetworkResponse = zod.object({
+  network: zod.string(),
+  horizonUrl: zod.string(),
+  usdcAsset: zod.string(),
+  protocolFeeAddress: zod.string(),
+  protocolFeeFraction: zod.number(),
+  horizonVersion: zod.string().optional(),
+  mppEnabled: zod.boolean(),
+});
+
+/**
+ * @summary Get XLM and USDC balance for a Stellar address
+ */
+export const GetStellarBalanceParams = zod.object({
+  address: zod.coerce.string(),
+});
+
+export const GetStellarBalanceResponse = zod.object({
+  address: zod.string(),
+  network: zod.string(),
+  balances: zod.object({
+    xlm: zod.string(),
+    usdc: zod.string(),
+  }),
+  horizonUrl: zod.string().optional(),
+});
+
+/**
+ * @summary Build an MPP-style split payment XDR (90% service, 10% protocol fee)
+ */
+export const BuildStellarPaymentBody = zod.object({
+  fromSecretKey: zod.string(),
+  toAddress: zod.string(),
+  amountUsdc: zod.number(),
+  memo: zod.string().optional(),
+});
+
+export const BuildStellarPaymentResponse = zod.object({
+  xdr: zod.string(),
+  fromAddress: zod.string(),
+  toAddress: zod.string(),
+  amountUsdc: zod.number(),
+  mppSplit: zod.object({
+    serviceAmount: zod.string(),
+    protocolFee: zod.string(),
+    protocolFeeAddress: zod.string(),
+  }),
+  network: zod.string(),
+  instructions: zod.string().optional(),
+});
+
+/**
+ * @summary Submit a signed XDR transaction to Stellar Testnet
+ */
+export const SubmitStellarPaymentBody = zod.object({
+  xdr: zod.string(),
+});
+
+export const SubmitStellarPaymentResponse = zod.object({
+  txHash: zod.string(),
+  ledger: zod.number().optional(),
+  successful: zod.boolean(),
+  explorerUrl: zod.string().optional(),
+  nextStep: zod.string().optional(),
+});
+
+/**
+ * @summary Verify a Stellar USDC payment transaction on Horizon
+ */
+export const VerifyStellarPaymentParams = zod.object({
+  txHash: zod.coerce.string(),
+});
+
+export const VerifyStellarPaymentQueryParams = zod.object({
+  payTo: zod.coerce.string(),
+  minAmount: zod.coerce.string(),
+});
+
+export const VerifyStellarPaymentResponse = zod.object({
+  valid: zod.boolean(),
+  txHash: zod.string(),
+  fromAddress: zod.string().optional(),
+  toAddress: zod.string().optional(),
+  amount: zod.string().optional(),
+  assetCode: zod.string().optional(),
+  memo: zod.string().optional(),
+  error: zod.string().optional(),
+  explorerUrl: zod.string().optional(),
+});
