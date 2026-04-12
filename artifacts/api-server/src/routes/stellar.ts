@@ -35,32 +35,27 @@ const router: IRouter = Router();
 router.get("/stellar/network", async (_req, res): Promise<void> => {
   const asset = getPaymentAsset();
   const assetStr = asset.isNative() ? "XLM" : `${asset.getCode()}:${asset.getIssuer()}`;
+
+  // Use direct fetch to check Horizon — server.serverInfo() is unreliable in some SDK versions
+  let horizonConnected = false;
   try {
-    await server.serverInfo();
-    res.json({
-      network: "testnet",
-      horizonUrl: HORIZON_URL,
-      paymentAsset: assetStr,
-      assetName: getAssetDisplayName(),
-      protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? PROTOCOL_FEE_ADDRESS_DISPLAY,
-      protocolFeeAddressValid: PROTOCOL_FEE_ADDRESS !== null,
-      protocolFeeFraction: PROTOCOL_FEE_FRACTION,
-      horizonConnected: true,
-      mppEnabled: true,
-    });
+    const resp = await fetch(`${HORIZON_URL}/`);
+    horizonConnected = resp.ok;
   } catch {
-    res.json({
-      network: "testnet",
-      horizonUrl: HORIZON_URL,
-      paymentAsset: assetStr,
-      assetName: getAssetDisplayName(),
-      protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? PROTOCOL_FEE_ADDRESS_DISPLAY,
-      protocolFeeAddressValid: PROTOCOL_FEE_ADDRESS !== null,
-      protocolFeeFraction: PROTOCOL_FEE_FRACTION,
-      horizonConnected: false,
-      mppEnabled: true,
-    });
+    horizonConnected = false;
   }
+
+  res.json({
+    network: "testnet",
+    horizonUrl: HORIZON_URL,
+    paymentAsset: assetStr,
+    assetName: getAssetDisplayName(),
+    protocolFeeAddress: PROTOCOL_FEE_ADDRESS ?? PROTOCOL_FEE_ADDRESS_DISPLAY,
+    protocolFeeAddressValid: PROTOCOL_FEE_ADDRESS !== null,
+    protocolFeeFraction: PROTOCOL_FEE_FRACTION,
+    horizonConnected,
+    mppEnabled: true,
+  });
 });
 
 /**

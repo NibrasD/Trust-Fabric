@@ -253,6 +253,11 @@ export default function StellarLab() {
               <ArrowRight className="h-3 w-3 text-muted-foreground" />
               <span className="text-muted-foreground">protocol fee</span>
             </div>
+            {networkInfo && !networkInfo.protocolFeeAddressValid && (
+              <p className="text-[10px] text-yellow-500 mt-1">
+                Fee address not configured — 100% to service
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
