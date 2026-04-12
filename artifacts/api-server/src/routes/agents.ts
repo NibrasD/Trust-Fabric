@@ -69,16 +69,22 @@ router.get("/agents/stats/summary", async (_req, res): Promise<void> => {
   const total = agents.length;
   const active = agents.filter((a) => a.isActive).length;
   const avgRep = total > 0 ? agents.reduce((s, a) => s + Number(a.reputationScore), 0) / total : 0;
-  const totalVol = agents.reduce((s, a) => s + Number(a.totalSpentUsdc), 0);
-  const totalTx = agents.reduce((s, a) => s + a.totalTransactions, 0);
-  const top = agents.sort((a, b) => Number(b.reputationScore) - Number(a.reputationScore))[0];
+  const top = [...agents].sort((a, b) => Number(b.reputationScore) - Number(a.reputationScore))[0];
+
+  // Always derive volume and tx count from the actual payments table — not agent cache fields
+  const [paymentTotals] = await db
+    .select({
+      totalVolume: sql<number>`coalesce(sum(${paymentsTable.amountUsdc}::numeric), 0)::float`,
+      totalCount: sql<number>`count(*)::int`,
+    })
+    .from(paymentsTable);
 
   res.json({
     totalAgents: total,
     activeAgents: active,
     avgReputationScore: Math.round(avgRep * 100) / 100,
-    totalPaymentVolume: Math.round(totalVol * 1000000) / 1000000,
-    totalTransactions: totalTx,
+    totalPaymentVolume: Math.round((paymentTotals?.totalVolume ?? 0) * 1000000) / 1000000,
+    totalTransactions: paymentTotals?.totalCount ?? 0,
     topAgent: top ? formatAgent(top) : null,
   });
 });
