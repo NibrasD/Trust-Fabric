@@ -12,6 +12,7 @@ import {
   PROTOCOL_FEE_ADDRESS,
   isValidStellarAddress,
 } from "../lib/stellarPayments.js";
+import { sorobanRecordPayment, sorobanEnabled } from "../lib/soroban.js";
 
 const router: IRouter = Router();
 
@@ -219,6 +220,11 @@ router.post(
       .set({ totalCalls: (svc?.totalCalls ?? 0) + 1 })
       .where(eq(servicesTable.id, serviceId));
 
+    // Fire-and-forget: record payment on Soroban Reputation contract
+    // Only runs when SOROBAN_REPUTATION_CONTRACT_ID + SOROBAN_ADMIN_SECRET are set
+    const amountStroops = BigInt(Math.round(0.1 * 10_000_000));
+    sorobanRecordPayment(agent.stellarAddress, amountStroops).catch(() => {});
+
     res.json({
       summary,
       wordCount,
@@ -227,6 +233,7 @@ router.post(
       txHash,
       verifiedOnChain,
       mppEnabled: true,
+      sorobanEnabled: sorobanEnabled(),
       payTo: SUMMARIZER_PAYTO,
     });
   }

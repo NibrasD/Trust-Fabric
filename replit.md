@@ -15,9 +15,18 @@ Enables AI agents to:
 - **x402 Middleware**: Custom `x402Middleware.ts` implements the full x402 HTTP payment standard for Stellar
 - **MPP Payments**: `buildMppPaymentTransaction()` creates atomic multi-operation transactions splitting payments
 - **Horizon Verification**: `verifyPayment()` checks Stellar Testnet via Horizon API (enabled via `STELLAR_VERIFY_ONCHAIN=true`)
-- **Payment Asset**: Native XLM by default (no trustline needed); set `USDC_ISSUER` for USDC
+- **Payment Asset**: USDC (issuer `GBB6YO4V5K37CXZV4N3ZG4X7NQBCOSSFFQ566CAWSXGMCDIG63GH7UCZ`) — all 6 service accounts + demo agent have 100+ USDC funded; set via `USDC_ISSUER` env var
 - **Friendbot**: `createAndFundTestnetAccount()` creates and funds real Stellar Testnet keypairs
-- **Demo Agent**: `examples/demo-agent/agent.ts` shows full x402 cycle with `--real-payment` flag for real Stellar tx
+- **Demo Agent**: `examples/demo-agent/agent.ts` shows full x402 cycle with `--real-payment` flag for real Stellar tx; uses correct USDC issuer
+- **Soroban Integration**: `soroban.ts` uses `rpc.Server` + `Contract.call()` to invoke reputation/session/registry contracts; graceful fallback when env vars not set
+- **Soroban Status API**: `GET /api/stellar/soroban` returns contract deployment status (shown on Dashboard)
+
+## Funded Testnet Accounts
+
+- **Demo Agent**: `GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB` — 500 USDC + XLM
+- **Protocol Fee**: `GAUFDDTXBUK3SGKGZQVAXPJDAF3FTUAN325DEKIEUXEGFBMGMWQI5O75` — 100 USDC
+- All 6 service accounts funded with XLM + 100 USDC trustlines via custom issuer
+- **USDC Issuer**: `GBB6YO4V5K37CXZV4N3ZG4X7NQBCOSSFFQ566CAWSXGMCDIG63GH7UCZ` (controlled; Circle testnet USDC requires fiat onramp)
 
 ## Project Structure
 
@@ -99,8 +108,14 @@ Key relationships:
 - `DATABASE_URL` — PostgreSQL connection string
 - `SESSION_SECRET` — Cookie signing secret
 - `PORT` — Server port (auto-assigned by Replit)
+- `USDC_ISSUER` — USDC asset issuer (`GBB6YO4V5K37CXZV4N3ZG4X7NQBCOSSFFQ566CAWSXGMCDIG63GH7UCZ`) — **set and active**
+- `PROTOCOL_FEE_ADDRESS` — Protocol fee receiver (`GAUFDDTXBUK3...`) — **set and active**
+- `SOROBAN_REPUTATION_CONTRACT_ID` — Reputation contract (set once deployed from `contracts/`)
+- `SOROBAN_REGISTRY_CONTRACT_ID` — Registry contract (set once deployed)
+- `SOROBAN_SESSION_CONTRACT_ID` — Session policy contract (set once deployed)
+- `SOROBAN_ADMIN_SECRET` — Admin signing key for Soroban invocations
 
-See `.env.example` for full list including Stellar/Soroban configuration.
+See `contracts/DEPLOY.md` for Soroban deployment instructions.
 
 ## User Preferences
 

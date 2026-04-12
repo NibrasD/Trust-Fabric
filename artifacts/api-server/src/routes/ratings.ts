@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, ratingsTable, agentsTable, servicesTable, paymentsTable } from "@workspace/db";
 import { SubmitRatingBody } from "@workspace/api-zod";
+import { sorobanSubmitRating } from "../lib/soroban.js";
 
 const router: IRouter = Router();
 
@@ -76,6 +77,10 @@ router.post("/ratings", async (req, res): Promise<void> => {
     .update(servicesTable)
     .set({ avgRating: String(Math.round(svcAvg * 100) / 100) })
     .where(eq(servicesTable.id, Number(serviceId)));
+
+  // Fire-and-forget: update reputation on Soroban contract
+  const amountStroops = BigInt(Math.round(amountUsdc * 10_000_000));
+  sorobanSubmitRating(agent.stellarAddress, stars, amountStroops).catch(() => {});
 
   res.status(201).json({
     id: String(rating!.id),

@@ -1,15 +1,35 @@
 import { useGetAgentsSummary, useGetPaymentVolume, useGetServiceCategoryCounts } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, Users, CreditCard, ArrowUpRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Activity, Users, CreditCard, ArrowUpRight, CheckCircle2, Clock, FileCode2, ExternalLink } from "lucide-react";
 import { formatUsdc } from "@/lib/utils";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 export default function Dashboard() {
   const { data: summary, isLoading: isLoadingSummary } = useGetAgentsSummary();
   const { data: volumeData, isLoading: isLoadingVolume } = useGetPaymentVolume({ days: 30 });
   const { data: categories, isLoading: isLoadingCategories } = useGetServiceCategoryCounts();
+  const { data: sorobanData, isLoading: isLoadingSoroban } = useQuery({
+    queryKey: ["soroban-status"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/stellar/soroban`);
+      if (!res.ok) throw new Error("Failed to load Soroban status");
+      return res.json();
+    },
+    refetchInterval: 60000,
+  });
+
+  const soroban = sorobanData as {
+    enabled: boolean;
+    contracts: Array<{ name: string; description: string; contractId: string | null; deployed: boolean; sourceFile: string }>;
+    deploymentNote: string;
+    rpcUrl: string;
+  } | undefined;
 
   return (
     <div className="space-y-6">
@@ -178,6 +198,79 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Soroban Contracts Status */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileCode2 className="h-5 w-5 text-primary" />
+                Soroban Smart Contracts
+              </CardTitle>
+              <CardDescription className="mt-1">
+                {isLoadingSoroban ? "Loading contract status..." : (soroban?.deploymentNote ?? "On-chain contract layer for reputation, registry, and session policy")}
+              </CardDescription>
+            </div>
+            {soroban && (
+              <Badge variant={soroban.enabled ? "default" : "secondary"} className="shrink-0">
+                {soroban.enabled ? "Live On-Chain" : "Pending Deployment"}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingSoroban ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : soroban ? (
+            <div className="space-y-3">
+              {soroban.contracts.map((contract) => (
+                <div
+                  key={contract.name}
+                  className="flex items-start gap-3 rounded-lg border p-3"
+                >
+                  {contract.deployed ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  ) : (
+                    <Clock className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{contract.name}</span>
+                      <Badge variant={contract.deployed ? "default" : "outline"} className="text-[10px] px-1.5 py-0">
+                        {contract.deployed ? "deployed" : "written"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{contract.description}</p>
+                    {contract.deployed && contract.contractId ? (
+                      <a
+                        href={`https://stellar.expert/explorer/testnet/contract/${contract.contractId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-1"
+                      >
+                        <span className="font-mono">{contract.contractId.slice(0, 12)}...</span>
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground font-mono mt-1 block">
+                        {contract.sourceFile}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <p className="text-[10px] text-muted-foreground pt-1">
+                RPC: <span className="font-mono">{soroban.rpcUrl}</span>
+              </p>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">Could not load Soroban status</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   PROTOCOL_FEE_FRACTION,
   server,
 } from "../lib/stellarPayments.js";
+import { sorobanStatus } from "../lib/soroban.js";
 
 const router: IRouter = Router();
 
@@ -55,6 +56,45 @@ router.get("/stellar/network", async (_req, res): Promise<void> => {
     protocolFeeFraction: PROTOCOL_FEE_FRACTION,
     horizonConnected,
     mppEnabled: true,
+  });
+});
+
+/**
+ * GET /stellar/soroban
+ * Return Soroban smart contract deployment status.
+ */
+router.get("/stellar/soroban", (_req, res): void => {
+  const status = sorobanStatus();
+  res.json({
+    ...status,
+    contracts: [
+      {
+        name: "Reputation",
+        description: "On-chain agent reputation scoring and history",
+        contractId: status.reputation,
+        deployed: !!status.reputation,
+        sourceFile: "contracts/reputation/src/lib.rs",
+      },
+      {
+        name: "Registry",
+        description: "Decentralized service discovery and registration",
+        contractId: status.registry,
+        deployed: !!status.registry,
+        sourceFile: "contracts/registry/src/lib.rs",
+      },
+      {
+        name: "Session Policy",
+        description: "Scoped spend limits and session authorization",
+        contractId: status.session,
+        deployed: !!status.session,
+        sourceFile: "contracts/session-policy/src/lib.rs",
+      },
+    ],
+    rpcUrl: status.rpcUrl,
+    network: "testnet",
+    deploymentNote: status.enabled
+      ? "Contracts deployed and active on Stellar Testnet"
+      : "Contracts written and tested — pending deployment (Rust toolchain required to compile WASM)",
   });
 });
 

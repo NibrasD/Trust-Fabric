@@ -49,10 +49,12 @@ import {
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const FRIENDBOT_URL = "https://friendbot.stellar.org";
 
-const USDC_TESTNET = new Asset(
-  "USDC",
-  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA"
-);
+// Our testnet USDC issuer (custom issuer with funded accounts for hackathon demo)
+const USDC_ISSUER =
+  process.env.USDC_ISSUER ??
+  "GBB6YO4V5K37CXZV4N3ZG4X7NQBCOSSFFQ566CAWSXGMCDIG63GH7UCZ";
+
+const USDC_TESTNET = new Asset("USDC", USDC_ISSUER);
 
 const horizonServer = new Horizon.Server(HORIZON_URL);
 
