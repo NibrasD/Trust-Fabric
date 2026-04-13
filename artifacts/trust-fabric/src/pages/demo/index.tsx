@@ -29,6 +29,7 @@ export default function DemoLab() {
   const { data: servicesData } = useListServices({ limit: 100 });
   const runDemoMutation = useRunDemoAgent();
   const [demoResult, setDemoResult] = useState<any | null>(null);
+  const [demoError, setDemoError] = useState<{ error: string; steps: any[] } | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,12 +42,24 @@ export default function DemoLab() {
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     setDemoResult(null);
+    setDemoError(null);
     runDemoMutation.mutate({ data: values }, {
       onSuccess: (result) => {
         setDemoResult(result);
         toast({ title: "Demo Complete", description: "Agent successfully negotiated, paid, and rated the service." });
       },
-      onError: (err) => {
+      onError: async (err: any) => {
+        // Try to extract partial steps from the error response body
+        try {
+          const body = err?.response ? await err.response.json() : null;
+          if (body?.steps) {
+            setDemoError({ error: body.error ?? err.message, steps: body.steps });
+            return;
+          }
+        } catch {
+          // fall through to generic toast
+        }
+        setDemoError({ error: err.message, steps: [] });
         toast({ title: "Demo Failed", description: err.message, variant: "destructive" });
       }
     });
@@ -54,7 +67,7 @@ export default function DemoLab() {
 
   const StepIcon = ({ status }: { status: string }) => {
     if (status === 'success') return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-    if (status === 'failed') return <XCircle className="h-5 w-5 text-red-500" />;
+    if (status === 'failed' || status === 'error') return <XCircle className="h-5 w-5 text-red-500" />;
     if (status === 'skipped') return <CircleDashed className="h-5 w-5 text-muted-foreground" />;
     return <Clock className="h-5 w-5 text-yellow-500 animate-pulse" />;
   };
@@ -162,6 +175,40 @@ export default function DemoLab() {
                   <Activity className="h-12 w-12 text-primary animate-pulse relative z-10" />
                 </div>
                 <p className="font-mono text-sm animate-pulse">Negotiating on-chain payment...</p>
+              </div>
+            ) : demoError ? (
+              <div className="space-y-6">
+                {demoError.steps.length > 0 && (
+                  <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
+                    {demoError.steps.map((step: any, i: number) => (
+                      <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-background bg-card shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                          <StepIcon status={step.status} />
+                        </div>
+                        <div className={`w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-card border p-3 rounded-md shadow-sm ${step.status === 'error' ? 'border-red-500/40 bg-red-500/5' : ''}`}>
+                          <h4 className="font-semibold text-sm mb-1">{step.step.replace(/_/g, ' ').toUpperCase()}</h4>
+                          <p className={`text-xs ${step.status === 'error' ? 'text-red-400' : 'text-muted-foreground'}`}>{step.message}</p>
+                          {step.data && Object.keys(step.data).length > 0 && (
+                            <pre className="mt-2 text-[10px] bg-muted p-2 rounded overflow-x-auto text-primary/80 font-mono">
+                              {JSON.stringify(step.data, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="pt-4 border-t border-red-500/20">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm">
+                    <h4 className="font-bold mb-1 flex items-center gap-2 text-red-400">
+                      <XCircle className="h-4 w-4" /> Access Denied
+                    </h4>
+                    <p className="text-muted-foreground">{demoError.error}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Go to <span className="font-mono text-primary">/sessions</span> and create an active session for this agent to allow it to run.
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : demoResult ? (
               <div className="space-y-6">

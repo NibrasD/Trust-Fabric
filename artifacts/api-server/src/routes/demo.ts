@@ -73,52 +73,71 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     ? Number(existingSession.spentUsdc) + amountUsdc <= Number(existingSession.maxSpendUsdc)
     : true;
 
-  if (existingSession && endpointAllowed && withinBudget) {
-    // Re-use the existing session
-    sessionId = existingSession.id;
+  if (!existingSession) {
+    // No active session at all — hard block
     steps.push({
       step: "session_check",
-      status: "success",
-      message: `Active session found — endpoint ${svc.endpoint} whitelisted, ${(Number(existingSession.maxSpendUsdc) - Number(existingSession.spentUsdc)).toFixed(4)} USDC remaining`,
+      status: "error",
+      message: `Access denied — no active session found for agent "${agent.name}". Create a session in Sessions Manager before running this agent.`,
       data: {
-        sessionId: String(sessionId),
-        sessionToken: sessionToken.slice(0, 20) + "...",
-        maxSpendUsdc: Number(existingSession.maxSpendUsdc),
-        spentUsdc: Number(existingSession.spentUsdc),
-        allowedEndpoints: sessionEndpoints,
-        expiresAt: existingSession.expiresAt.toISOString(),
+        agentId: String(agentId),
+        agentName: agent.name,
+        sessionFound: false,
+        hint: "Go to /sessions and create an active session for this agent",
       },
     });
-  } else if (existingSession && (!endpointAllowed || !withinBudget)) {
-    // Session exists but blocked — report why and continue without session
-    sessionWasNew = false;
-    const reason = !endpointAllowed
-      ? `endpoint ${svc.endpoint} not in session allowlist`
-      : `spend limit reached (${Number(existingSession.spentUsdc).toFixed(4)} / ${Number(existingSession.maxSpendUsdc).toFixed(4)} USDC)`;
+    res.status(403).json({ steps, error: "No active session for this agent." });
+    return;
+  }
+
+  if (!endpointAllowed) {
+    // Session exists but endpoint not whitelisted
     steps.push({
       step: "session_check",
-      status: "skipped",
-      message: `Session policy denied — ${reason}. Proceeding with payment-only access.`,
+      status: "error",
+      message: `Access denied — endpoint "${svc.endpoint}" is not in this session's allowlist.`,
       data: {
         sessionId: String(existingSession.id),
-        denied: true,
-        reason,
-        fallback: "payment_only",
+        allowedEndpoints: sessionEndpoints,
+        requestedEndpoint: svc.endpoint,
       },
     });
-  } else {
-    // No active session — proceed with payment-only access (no session needed)
+    res.status(403).json({ steps, error: `Endpoint ${svc.endpoint} not allowed by session policy.` });
+    return;
+  }
+
+  if (!withinBudget) {
+    // Session exists but spend limit exhausted
     steps.push({
       step: "session_check",
-      status: "skipped",
-      message: `No active session for this agent — open access via payment. Create a session in Sessions Manager to enforce spend limits and endpoint policies.`,
+      status: "error",
+      message: `Access denied — session spend limit reached (${Number(existingSession.spentUsdc).toFixed(4)} / ${Number(existingSession.maxSpendUsdc).toFixed(4)} USDC). Create a new session to continue.`,
       data: {
-        sessionFound: false,
-        fallback: "payment_only",
-        hint: "Visit /sessions to create a scoped session for this agent",
+        sessionId: String(existingSession.id),
+        spentUsdc: Number(existingSession.spentUsdc),
+        maxSpendUsdc: Number(existingSession.maxSpendUsdc),
+        requestedAmount: amountUsdc,
       },
     });
+    res.status(402).json({ steps, error: "Session spend limit exhausted." });
+    return;
   }
+
+  // All checks passed — use this session
+  sessionId = existingSession.id;
+  steps.push({
+    step: "session_check",
+    status: "success",
+    message: `Active session found — endpoint ${svc.endpoint} whitelisted, ${(Number(existingSession.maxSpendUsdc) - Number(existingSession.spentUsdc)).toFixed(4)} USDC remaining`,
+    data: {
+      sessionId: String(sessionId),
+      sessionToken: existingSession.sessionToken.slice(0, 20) + "...",
+      maxSpendUsdc: Number(existingSession.maxSpendUsdc),
+      spentUsdc: Number(existingSession.spentUsdc),
+      allowedEndpoints: sessionEndpoints,
+      expiresAt: existingSession.expiresAt.toISOString(),
+    },
+  });
 
   // ── Step 3: x402 Request ──────────────────────────────────────────────────
   const x402Challenge = buildX402Challenge({
