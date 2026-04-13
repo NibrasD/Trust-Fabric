@@ -12,6 +12,7 @@ import {
   PROTOCOL_FEE_FRACTION,
   server as horizonServer,
 } from "../lib/stellarPayments.js";
+import { sorobanAuthorizeSpend } from "../lib/soroban.js";
 
 // Demo agent keypair — funded with testnet USDC, signs all demo payments
 const DEMO_AGENT_SECRET = process.env.DEMO_AGENT_SECRET;
@@ -173,20 +174,49 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     },
   });
 
-  // ── Step 4: Payment ───────────────────────────────────────────────────────
+  // ── Step 4: Soroban On-Chain Authorization ───────────────────────────────
+  let sorobanAuthHash: string | null = null;
+  if (existingSession) {
+    const sorobanAuth = await sorobanAuthorizeSpend(existingSession.sessionToken, amountUsdc);
+    if (sorobanAuth) {
+      sorobanAuthHash = sorobanAuth.sorobanAuthHash;
+      steps.push({
+        step: "soroban_authorization",
+        status: "success",
+        message: `Soroban session contract authorized spend of ${amountUsdc} USDC on-chain`,
+        data: {
+          sorobanAuthTxHash: sorobanAuth.sorobanAuthHash,
+          onChainSpentUsdc: sorobanAuth.onChainSpentUsdc,
+          onChainMaxSpendUsdc: sorobanAuth.onChainMaxSpendUsdc,
+          contractId: "CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7",
+          explorerUrl: `https://stellar.expert/explorer/testnet/tx/${sorobanAuth.sorobanAuthHash}`,
+        },
+      });
+    } else {
+      steps.push({
+        step: "soroban_authorization",
+        status: "error",
+        message: "Soroban session contract DENIED this spend — on-chain budget exceeded or session not registered on-chain",
+        data: { sessionToken: existingSession.sessionToken.slice(0, 20) + "..." },
+      });
+      res.status(403).json({ steps, error: "On-chain session authorization denied by Soroban contract." });
+      return;
+    }
+  }
+
+  // ── Step 5: Payment ───────────────────────────────────────────────────────
   let txHash: string;
   let verifiedOnChain = false;
   const serviceAmount = (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7);
   const feeAmount = (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7);
 
   if (demoKeypair) {
-    // Real Stellar testnet payment via demo agent keypair
     try {
       const { xdr } = await buildMppPaymentTransaction({
         fromKeypair: demoKeypair,
         serviceAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS ?? demoKeypair.publicKey(),
         amountUsdc,
-        memo: `stf-x402-demo`,
+        memo: sorobanAuthHash ? `stf:${sorobanAuthHash.slice(0, 20)}` : `stf-x402-demo`,
       });
       const { TransactionBuilder } = await import("@stellar/stellar-sdk");
       const { STELLAR_PASSPHRASE } = await import("../lib/stellarPayments.js");
@@ -195,7 +225,6 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       txHash = result.hash;
       verifiedOnChain = true;
     } catch (payErr: any) {
-      // Fallback to simulated if real payment fails — log the real reason
       const errDetail = payErr?.response
         ? await payErr.response.json().catch(() => ({ raw: payErr.message }))
         : { raw: payErr?.message ?? String(payErr) };
@@ -205,7 +234,6 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       (steps as any).__paymentError = errDetail;
     }
   } else {
-    // No demo keypair configured — simulated payment
     txHash = randomBytes(32).toString("hex");
     verifiedOnChain = false;
     (steps as any).__paymentError = { raw: "DEMO_AGENT_SECRET not configured on this server" };
@@ -271,6 +299,10 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       ...(sessionId != null ? { sessionId: String(sessionId) } : { sessionId: null }),
       paymentId: String(payment!.id),
       stellarExplorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      ...(sorobanAuthHash ? {
+        sorobanAuthTxHash: sorobanAuthHash,
+        sorobanExplorerUrl: `https://stellar.expert/explorer/testnet/tx/${sorobanAuthHash}`,
+      } : {}),
     },
   });
 

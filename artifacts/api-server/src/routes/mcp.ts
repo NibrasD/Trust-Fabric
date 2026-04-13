@@ -18,6 +18,7 @@ import {
 } from "../lib/stellarPayments.js";
 import { Keypair } from "@stellar/stellar-sdk";
 import { logger } from "../lib/logger.js";
+import { sorobanAuthorizeSpend } from "../lib/soroban.js";
 
 const router: IRouter = Router();
 
@@ -182,6 +183,12 @@ async function callTool(
         return null;
       }
 
+      const sorobanAuth = await sorobanAuthorizeSpend(session.sessionToken, amountUsdc);
+      if (!sorobanAuth) {
+        logger.warn({ tool: name, agentId: agent.id }, "MCP auto-pay blocked: soroban_authorization_denied — on-chain session contract rejected this spend");
+        return null;
+      }
+
       const { xdr } = await buildMppPaymentTransaction({
         fromKeypair: fromKp,
         serviceAddress: toAddress,
@@ -189,12 +196,17 @@ async function callTool(
       });
       const result = await submitTransaction(xdr);
 
-      // Deduct from session budget after successful submission
       const newSpent = Number(session.spentUsdc) + amountUsdc;
       await db
         .update(sessionsTable)
         .set({ spentUsdc: String(newSpent) })
         .where(eq(sessionsTable.id, session.id));
+
+      logger.info({
+        tool: name,
+        stellarTxHash: result.txHash,
+        sorobanAuthHash: sorobanAuth.sorobanAuthHash,
+      }, "MCP auto-pay: Soroban authorized + Stellar payment submitted");
 
       return result.txHash;
     } catch (e: unknown) {

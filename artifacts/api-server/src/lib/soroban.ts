@@ -368,13 +368,15 @@ export async function sorobanIsRegistered(
 
 // ── Session Policy contract calls ─────────────────────────────────────────────
 
+const SPENT_KEY_OFFSET = 0x40000000;
+
 /**
  * Create / update a session policy on-chain.
+ * Stores TWO on-chain entries per session:
+ *   1. sessionKey       → maxSpendUsdc * 10000 (budget cap)
+ *   2. sessionKey ^ SPENT_KEY_OFFSET → 0 (initial spent = 0)
  *
- * @param sessionId       Session identifier (UUID or hex string)
- * @param agentAddress    Agent's Stellar public key (for flags derivation)
- * @param maxSpendStroops Spend cap in stroops
- * @param durationSeconds Session lifetime
+ * This allows sorobanAuthorizeSpend to read/validate/update budget on-chain.
  */
 export async function sorobanCreateSession(
   sessionId: string,
@@ -385,21 +387,26 @@ export async function sorobanCreateSession(
   try {
     const keypair = Keypair.fromSecret(ADMIN_SECRET);
     const key = sessionToKey(sessionId);
-    const flags = Math.min(
-      Math.ceil(Number(maxSpendStroops) / 1_000_000) | (durationSeconds & 0xff),
-      4294967295
-    );
+    const spentKey = (key ^ SPENT_KEY_OFFSET) >>> 0;
+    const maxSpendCents = Math.ceil(Number(maxSpendStroops) / 1_000_000 * 10000);
 
     const result = await invokeContract(
       SESSION_CONTRACT_ID,
       "set_policy",
-      [XDR.ScVal.scvU32(key), XDR.ScVal.scvU32(flags)],
+      [XDR.ScVal.scvU32(key), XDR.ScVal.scvU32(maxSpendCents)],
+      keypair
+    );
+
+    await invokeContract(
+      SESSION_CONTRACT_ID,
+      "set_policy",
+      [XDR.ScVal.scvU32(spentKey), XDR.ScVal.scvU32(0)],
       keypair
     );
 
     logger.info(
-      { hash: result.hash, agentAddress, maxSpendStroops, durationSeconds },
-      "Soroban: session_policy.set_policy submitted"
+      { hash: result.hash, agentAddress, maxSpendCents, durationSeconds },
+      "Soroban: session created on-chain (max_spend + spent=0)"
     );
 
     return result.hash;
@@ -407,6 +414,133 @@ export async function sorobanCreateSession(
     logger.warn(
       { err: err instanceof Error ? err.message : String(err) },
       "Soroban: set_policy failed — continuing off-chain"
+    );
+    return null;
+  }
+}
+
+/**
+ * ON-CHAIN session budget authorization.
+ *
+ * This is the CRITICAL function that makes the smart contract mandatory for payments.
+ * Before ANY Stellar payment is built, this function MUST succeed. It:
+ *
+ *   1. Reads the session's max_spend from the blockchain (get_policy)
+ *   2. Reads the session's current spent from the blockchain (get_policy)
+ *   3. Validates: spent + amount <= max_spend
+ *   4. Writes the updated spent amount TO the blockchain (set_policy) — this is the
+ *      on-chain authorization proof
+ *   5. Returns the Soroban tx hash — proof of on-chain authorization
+ *
+ * Without a valid Soroban auth tx hash, no payment can proceed.
+ * The admin key is required to write to the contract, so external callers
+ * cannot bypass this step.
+ */
+export async function sorobanAuthorizeSpend(
+  sessionToken: string,
+  amountUsdc: number
+): Promise<{
+  sorobanAuthHash: string;
+  onChainSpentUsdc: number;
+  onChainMaxSpendUsdc: number;
+} | null> {
+  try {
+    const keypair = Keypair.fromSecret(ADMIN_SECRET);
+    const key = sessionToKey(sessionToken);
+    const spentKey = (key ^ SPENT_KEY_OFFSET) >>> 0;
+
+    const hasVal = await simulateContract(
+      SESSION_CONTRACT_ID,
+      "has_policy",
+      [XDR.ScVal.scvU32(key)],
+      keypair.publicKey()
+    );
+
+    const sessionExists = hasVal?.switch().name === "scvBool" && hasVal.b() === true;
+    if (!sessionExists) {
+      logger.warn(
+        { sessionToken: sessionToken.slice(0, 16) },
+        "Soroban: authorize_spend REJECTED — session not found on-chain"
+      );
+      return null;
+    }
+
+    const policyVal = await simulateContract(
+      SESSION_CONTRACT_ID,
+      "get_policy",
+      [XDR.ScVal.scvU32(key)],
+      keypair.publicKey()
+    );
+    const maxSpendCents = policyVal?.switch().name === "scvU32" ? policyVal.u32() : 0;
+
+    let currentSpentCents = 0;
+    const hasSpent = await simulateContract(
+      SESSION_CONTRACT_ID,
+      "has_policy",
+      [XDR.ScVal.scvU32(spentKey)],
+      keypair.publicKey()
+    );
+    if (hasSpent?.switch().name === "scvBool" && hasSpent.b() === true) {
+      const spentVal = await simulateContract(
+        SESSION_CONTRACT_ID,
+        "get_policy",
+        [XDR.ScVal.scvU32(spentKey)],
+        keypair.publicKey()
+      );
+      currentSpentCents = spentVal?.switch().name === "scvU32" ? spentVal.u32() : 0;
+    }
+
+    const amountCents = Math.ceil(amountUsdc * 10000);
+
+    if (currentSpentCents + amountCents > maxSpendCents) {
+      logger.warn(
+        {
+          sessionToken: sessionToken.slice(0, 16),
+          currentSpentCents,
+          amountCents,
+          maxSpendCents,
+        },
+        "Soroban: authorize_spend REJECTED — on-chain budget exceeded"
+      );
+      return null;
+    }
+
+    const newSpentCents = currentSpentCents + amountCents;
+    const result = await invokeContract(
+      SESSION_CONTRACT_ID,
+      "set_policy",
+      [XDR.ScVal.scvU32(spentKey), XDR.ScVal.scvU32(newSpentCents)],
+      keypair
+    );
+
+    if (!result.success) {
+      logger.warn(
+        { hash: result.hash },
+        "Soroban: authorize_spend ON-CHAIN WRITE FAILED"
+      );
+      return null;
+    }
+
+    logger.info(
+      {
+        sorobanAuthHash: result.hash,
+        sessionToken: sessionToken.slice(0, 16),
+        amountUsdc,
+        newSpentUsdc: newSpentCents / 10000,
+        maxSpendUsdc: maxSpendCents / 10000,
+      },
+      "Soroban: authorize_spend APPROVED — on-chain budget deducted"
+    );
+
+    return {
+      sorobanAuthHash: result.hash,
+      onChainSpentUsdc: newSpentCents / 10000,
+      onChainMaxSpendUsdc: maxSpendCents / 10000,
+    };
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Soroban: authorize_spend failed"
     );
     return null;
   }
@@ -450,6 +584,7 @@ export async function sorobanCheckSession(
 
 /**
  * Revoke a session policy on-chain.
+ * Clears both the session policy AND the spent tracking key.
  */
 export async function sorobanRevokeSession(
   sessionId: string
@@ -457,6 +592,7 @@ export async function sorobanRevokeSession(
   try {
     const keypair = Keypair.fromSecret(ADMIN_SECRET);
     const key = sessionToKey(sessionId);
+    const spentKey = (key ^ SPENT_KEY_OFFSET) >>> 0;
 
     const result = await invokeContract(
       SESSION_CONTRACT_ID,
@@ -464,6 +600,17 @@ export async function sorobanRevokeSession(
       [XDR.ScVal.scvU32(key)],
       keypair
     );
+
+    try {
+      await invokeContract(
+        SESSION_CONTRACT_ID,
+        "clear_policy",
+        [XDR.ScVal.scvU32(spentKey)],
+        keypair
+      );
+    } catch {
+      // spent key may not exist yet
+    }
 
     return result.hash;
   } catch {

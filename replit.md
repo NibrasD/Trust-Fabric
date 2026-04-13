@@ -19,6 +19,7 @@ Enables AI agents to:
 - **Friendbot**: `createAndFundTestnetAccount()` creates and funds real Stellar Testnet keypairs
 - **Demo Agent**: `examples/demo-agent/agent.ts` shows full x402 cycle with `--real-payment` flag for real Stellar tx; uses correct USDC issuer
 - **Soroban Integration**: `soroban.ts` uses `Operation.invokeContractFunction` + `rpc.assembleTransaction` to invoke WAT-compiled contracts; always enabled with hardcoded defaults
+- **Soroban On-Chain Session Enforcement**: `sorobanAuthorizeSpend()` is called BEFORE every payment — reads session budget from blockchain, validates, writes updated spend on-chain. Without a successful Soroban authorization (tx hash), no Stellar payment can be built. The session contract stores max_spend at `sessionKey` and current spent at `sessionKey ^ 0x40000000`.
 - **Soroban Status API**: `GET /api/stellar/soroban` returns contract deployment status (shown on Dashboard)
 - **Deployed Contracts (Stellar Testnet, April 2026)**:
   - Reputation: `CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6`

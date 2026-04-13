@@ -29,7 +29,7 @@ import {
   PROTOCOL_FEE_FRACTION,
   server,
 } from "../lib/stellarPayments.js";
-import { sorobanStatus } from "../lib/soroban.js";
+import { sorobanStatus, sorobanAuthorizeSpend } from "../lib/soroban.js";
 
 async function validateSessionBudget(
   sessionToken: string,
@@ -258,6 +258,15 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
   };
 
   try {
+    const sorobanAuth = await sorobanAuthorizeSpend(sessionToken, amountUsdc);
+    if (!sorobanAuth) {
+      res.status(403).json({
+        error: "soroban_authorization_failed",
+        message: "On-chain session authorization denied. The Soroban session policy contract rejected this spend. Ensure the session is registered on-chain with sufficient budget.",
+      });
+      return;
+    }
+
     const keypair = Keypair.fromSecret(fromSecretKey);
     const result = await buildMppPaymentTransaction({
       fromKeypair: keypair,
@@ -279,7 +288,14 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
       },
       network: "testnet",
       sessionContext,
-      instructions: "Pass the same sessionToken when submitting to deduct from your session budget",
+      sorobanAuthorization: {
+        authTxHash: sorobanAuth.sorobanAuthHash,
+        onChainSpentUsdc: sorobanAuth.onChainSpentUsdc,
+        onChainMaxSpendUsdc: sorobanAuth.onChainMaxSpendUsdc,
+        contractId: "CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7",
+        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${sorobanAuth.sorobanAuthHash}`,
+      },
+      instructions: "Pass the same sessionToken when submitting. The Soroban contract has already authorized and deducted this spend on-chain.",
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
