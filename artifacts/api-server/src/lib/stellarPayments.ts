@@ -518,6 +518,27 @@ export async function seedUsdcToAccount(
 }
 
 /**
+ * Submit a signed XDR transaction to Stellar Horizon and return tx hash.
+ */
+export async function submitTransaction(xdr: string): Promise<{
+  txHash: string;
+  ledger: number;
+  successful: boolean;
+  explorerUrl: string;
+}> {
+  const { TransactionBuilder } = await import("@stellar/stellar-sdk");
+  const tx = TransactionBuilder.fromXDR(xdr, STELLAR_PASSPHRASE);
+  const result = await server.submitTransaction(tx as Parameters<typeof server.submitTransaction>[0]);
+  const txHash = result.hash;
+  return {
+    txHash,
+    ledger: (result as unknown as { ledger: number }).ledger,
+    successful: true,
+    explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+  };
+}
+
+/**
  * Parse a Horizon submission error and return human-readable result codes.
  */
 export function parseHorizonError(err: unknown): {

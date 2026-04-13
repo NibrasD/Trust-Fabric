@@ -5,7 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/layout";
 
-// Pages
+// Core pages
+import LandingPage from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import AgentsList from "@/pages/agents/index";
 import AgentDetail from "@/pages/agents/detail";
@@ -19,27 +20,46 @@ import DemoLab from "@/pages/demo/index";
 import StellarLab from "@/pages/stellar/index";
 import SubmitRating from "@/pages/rate/index";
 
+// New pages
+import ExplorePage from "@/pages/explore/index";
+import NewProxy from "@/pages/proxies/new";
+import WorkflowsPage from "@/pages/workflows/index";
+import NewWorkflow from "@/pages/workflows/new";
+import PayPage from "@/pages/pay/index";
+import McpPage from "@/pages/mcp/index";
+
 const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/agents" component={AgentsList} />
-        <Route path="/agents/new" component={NewAgent} />
-        <Route path="/agents/:id" component={AgentDetail} />
-        <Route path="/sessions" component={SessionsList} />
-        <Route path="/sessions/new" component={NewSession} />
-        <Route path="/services" component={ServicesList} />
-        <Route path="/services/new" component={NewService} />
-        <Route path="/payments" component={PaymentsList} />
-        <Route path="/demo" component={DemoLab} />
-        <Route path="/stellar" component={StellarLab} />
-        <Route path="/rate" component={SubmitRating} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/home" component={LandingPage} />
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/agents" component={AgentsList} />
+            <Route path="/agents/new" component={NewAgent} />
+            <Route path="/agents/:id" component={AgentDetail} />
+            <Route path="/sessions" component={SessionsList} />
+            <Route path="/sessions/new" component={NewSession} />
+            <Route path="/services" component={ServicesList} />
+            <Route path="/services/new" component={NewService} />
+            <Route path="/payments" component={PaymentsList} />
+            <Route path="/demo" component={DemoLab} />
+            <Route path="/stellar" component={StellarLab} />
+            <Route path="/rate" component={SubmitRating} />
+            <Route path="/explore" component={ExplorePage} />
+            <Route path="/proxies/new" component={NewProxy} />
+            <Route path="/workflows" component={WorkflowsPage} />
+            <Route path="/workflows/new" component={NewWorkflow} />
+            <Route path="/pay" component={PayPage} />
+            <Route path="/mcp" component={McpPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

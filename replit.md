@@ -78,11 +78,12 @@ docs/
 
 ## Database Schema
 
-Tables: `agents`, `services`, `sessions`, `payments`, `ratings`
+Tables: `agents`, `services`, `sessions`, `payments`, `ratings`, `proxies`, `workflows`, `workflow_executions`
 
 Key relationships:
 - `payments` references `agents` + `services` + `sessions`
 - `ratings` references `agents` + `services` + `payments`
+- `workflow_executions` references `workflows`
 - Reputation is computed from payments and ratings
 
 ## Key Commands
@@ -112,6 +113,18 @@ Key relationships:
 - `GET /api/payments/stats/volume` — volume analytics
 - `POST /api/ratings` — submit post-transaction rating
 - `POST /api/demo/run` — simulate full agent cycle
+- `GET /api/proxies` — list all published API proxies
+- `POST /api/proxies` — publish a new API proxy
+- `GET /api/proxies/:id` — proxy detail
+- `PUT /api/proxies/:id` — update proxy
+- `DELETE /api/proxies/:id` — delete proxy
+- `POST /api/proxies/:id/call` — x402-gated proxy call (pass payment in Authorization header)
+- `GET /api/workflows` — list workflows
+- `POST /api/workflows` — create workflow
+- `GET /api/workflows/:id` — workflow detail
+- `POST /api/workflows/:id/execute` — run workflow (HTTP/payment/onchain steps)
+- `GET /api/mcp` — MCP server info (name, version, 10 tools)
+- `POST /api/mcp` — JSON-RPC 2.0 MCP endpoint (10 tools, auto-pay via Authorization: Bearer <stellar_secret>)
 
 ## Environment Variables
 

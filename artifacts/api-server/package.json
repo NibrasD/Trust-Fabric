@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@stellar/stellar-sdk": "^15.0.1",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
