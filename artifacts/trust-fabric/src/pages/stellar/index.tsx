@@ -80,17 +80,6 @@ export default function StellarLab() {
     explorerUrl: string;
   }>(null);
 
-  // State for payment verification
-  const [verifyTxHash, setVerifyTxHash] = useState("");
-  const [verifyPayTo, setVerifyPayTo] = useState("");
-  const [verifyMinAmount, setVerifyMinAmount] = useState("0.10");
-  const [verifyResult, setVerifyResult] = useState<null | {
-    valid: boolean;
-    fromAddress?: string;
-    amount?: string;
-    error?: string;
-    explorerUrl: string;
-  }>(null);
 
   // Network info
   const { data: networkData, isLoading: networkLoading, refetch: refetchNetwork } = useQuery({
@@ -162,7 +151,6 @@ export default function StellarLab() {
     mutationFn: (xdr: string) => apiPost("/stellar/payment/submit", { xdr }),
     onSuccess: (data) => {
       setSubmitResult(data as typeof submitResult);
-      setVerifyTxHash((data as any).txHash);
       toast({ title: "Transaction Submitted", description: "Payment confirmed on Stellar Testnet." });
     },
     onError: (err) => {
@@ -170,19 +158,6 @@ export default function StellarLab() {
     },
   });
 
-  // Verify payment mutation
-  const verifyMutation = useMutation({
-    mutationFn: () =>
-      apiGet(
-        `/stellar/payment/verify/${verifyTxHash}?payTo=${encodeURIComponent(verifyPayTo)}&minAmount=${verifyMinAmount}`
-      ),
-    onSuccess: (data) => {
-      setVerifyResult(data as typeof verifyResult);
-    },
-    onError: (err) => {
-      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
-    },
-  });
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -598,161 +573,71 @@ export default function StellarLab() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Submit Transaction */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ArrowRight className="h-5 w-5 text-primary" />
-              Submit to Stellar Testnet
-            </CardTitle>
-            <CardDescription>Submit a signed XDR transaction to Horizon.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Signed XDR</Label>
-              <textarea
-                className="w-full min-h-[80px] rounded-md border bg-muted px-3 py-2 text-[10px] font-mono resize-y"
-                placeholder="AAAAAQAA..."
-                value={xdrToSubmit}
-                onChange={(e) => setXdrToSubmit(e.target.value)}
-              />
-            </div>
-            <Button
-              className="w-full"
-              onClick={() => submitMutation.mutate(xdrToSubmit)}
-              disabled={submitMutation.isPending || !xdrToSubmit}
-            >
-              {submitMutation.isPending ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-              ) : (
-                "Submit Transaction"
-              )}
-            </Button>
-            {submitResult && (
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center gap-2">
-                  {submitResult.successful ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-red-500" />
-                  )}
-                  <span className="text-sm font-medium">
-                    {submitResult.successful ? "Transaction confirmed" : "Failed"}
-                  </span>
-                </div>
-                {submitResult.txHash && (
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Tx Hash</Label>
-                    <div className="flex items-center gap-2">
-                      <p className="font-mono text-xs break-all flex-1">{submitResult.txHash}</p>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => copyToClipboard(submitResult.txHash)}>
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <a
-                      href={submitResult.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      View on Stellar Expert <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                )}
-              </div>
+      {/* Submit Transaction */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowRight className="h-5 w-5 text-primary" />
+            Submit to Stellar Testnet
+          </CardTitle>
+          <CardDescription>Submit a signed XDR transaction to Horizon.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Signed XDR</Label>
+            <textarea
+              className="w-full min-h-[100px] rounded-md border bg-muted px-3 py-2 text-[10px] font-mono resize-y"
+              placeholder="AAAAAgAAAAB..."
+              value={xdrToSubmit}
+              onChange={(e) => setXdrToSubmit(e.target.value)}
+            />
+          </div>
+          <Button
+            className="w-full"
+            onClick={() => submitMutation.mutate(xdrToSubmit)}
+            disabled={submitMutation.isPending || !xdrToSubmit}
+          >
+            {submitMutation.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+            ) : (
+              "Submit Transaction"
             )}
-          </CardContent>
-        </Card>
-
-        {/* Verify Payment */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Verify Payment on Horizon
-            </CardTitle>
-            <CardDescription>
-              Confirm a Stellar tx hash contains a valid payment to the expected address.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Tx Hash</Label>
-              <Input
-                placeholder="ABC123... (64 hex chars)"
-                value={verifyTxHash}
-                onChange={(e) => setVerifyTxHash(e.target.value)}
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Pay To (expected recipient)</Label>
-              <Input
-                placeholder="G... (service address)"
-                value={verifyPayTo}
-                onChange={(e) => setVerifyPayTo(e.target.value)}
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Min Amount</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={verifyMinAmount}
-                onChange={(e) => setVerifyMinAmount(e.target.value)}
-              />
-            </div>
-            <Button
-              className="w-full"
-              variant="outline"
-              onClick={() => verifyMutation.mutate()}
-              disabled={verifyMutation.isPending || !verifyTxHash || !verifyPayTo}
-            >
-              {verifyMutation.isPending ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
-              ) : (
-                "Verify on Horizon"
-              )}
-            </Button>
-
-            {verifyResult && (
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center gap-2">
-                  {verifyResult.valid ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-red-500" />
-                  )}
-                  <span className="text-sm font-medium">
-                    {verifyResult.valid ? "Payment verified" : "Verification failed"}
-                  </span>
-                </div>
-                {verifyResult.valid && (
-                  <div className="text-xs space-y-1 text-muted-foreground">
-                    <p>From: <span className="font-mono">{verifyResult.fromAddress?.slice(0, 20)}...</span></p>
-                    <p>Amount: <span className="font-mono text-green-400">{verifyResult.amount} XLM</span></p>
+          </Button>
+          {submitResult && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <div className="flex items-center gap-2">
+                {submitResult.successful ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-sm font-medium">
+                  {submitResult.successful ? "Transaction confirmed" : "Transaction failed"}
+                </span>
+              </div>
+              {submitResult.txHash && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Tx Hash</Label>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-xs break-all flex-1">{submitResult.txHash}</p>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => copyToClipboard(submitResult.txHash)}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
                   </div>
-                )}
-                {!verifyResult.valid && verifyResult.error && (
-                  <p className="text-xs text-red-400">{verifyResult.error}</p>
-                )}
-                {verifyResult.explorerUrl && (
                   <a
-                    href={verifyResult.explorerUrl}
+                    href={submitResult.explorerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                   >
                     View on Stellar Expert <ExternalLink className="h-3 w-3" />
                   </a>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* x402 Integration Guide */}
       <Card className="bg-sidebar border-sidebar-border">
