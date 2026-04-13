@@ -168,16 +168,17 @@ async function callTool(
             gt(sessionsTable.expiresAt, now)
           )
         )
+        .orderBy(desc(sessionsTable.createdAt))
         .limit(1);
 
       if (!session) {
-        logger.warn({ tool: name, agentId: agent.id }, "MCP auto-pay blocked: no active session for agent");
+        logger.warn({ tool: name, agentId: agent.id }, "MCP auto-pay blocked: session_required — no active session for agent");
         return null;
       }
 
       const remaining = Number(session.maxSpendUsdc) - Number(session.spentUsdc);
       if (amountUsdc > remaining) {
-        logger.warn({ tool: name, agentId: agent.id, amountUsdc, remaining }, "MCP auto-pay blocked: session budget exceeded");
+        logger.warn({ tool: name, agentId: agent.id, amountUsdc, remaining }, "MCP auto-pay blocked: session_budget_exceeded");
         return null;
       }
 
@@ -215,7 +216,7 @@ async function callTool(
       // Auto-pay if STELLAR_SECRET is provided
       const txHash = await autoPay(SUMMARIZER_PAYTO, 0.1);
       if (!txHash && SUMMARIZER_PAYTO) {
-        return err("Payment required. Set STELLAR_SECRET in MCP env to enable auto-payment, or provide X-Payment header manually.");
+        return err("Payment required. Ensure: (1) STELLAR_SECRET is set in MCP env, (2) the agent has an active session with sufficient budget. Create a session via POST /api/sessions before calling this tool.");
       }
 
       const resp = await fetch(`${BASE_URL}/api/services/paid/summarize`, {
