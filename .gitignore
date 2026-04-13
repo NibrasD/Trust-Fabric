@@ -47,3 +47,15 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment secrets — never commit
+.env
+.env.*
+*.env
+*.env.local
+
+# Generated screenshots (build artifacts)
+screenshots/
+
+# Replit agent assets
+.agents/
