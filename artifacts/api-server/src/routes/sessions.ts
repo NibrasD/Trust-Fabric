@@ -8,6 +8,7 @@ import {
   RevokeSessionParams,
 } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
+import { sorobanCreateSession, sorobanRevokeSession } from "../lib/soroban.js";
 
 const router: IRouter = Router();
 
@@ -98,6 +99,14 @@ router.post("/sessions", async (req, res): Promise<void> => {
     })
     .returning();
 
+  // Fire-and-forget: register session policy on Soroban contract
+  sorobanCreateSession(
+    sessionToken,
+    agent.stellarAddress,
+    BigInt(Math.round(maxSpendUsdc * 1_000_000)),
+    durationMinutes * 60
+  ).catch(() => {});
+
   res.status(201).json(await formatSession(session!));
 });
 
@@ -140,6 +149,9 @@ router.post("/sessions/:sessionId/revoke", async (req, res): Promise<void> => {
     .set({ status: "revoked" })
     .where(eq(sessionsTable.id, session.id))
     .returning();
+
+  // Fire-and-forget: clear session policy on Soroban contract
+  sorobanRevokeSession(session.sessionToken).catch(() => {});
 
   res.json(await formatSession(updated!));
 });

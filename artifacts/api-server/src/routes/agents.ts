@@ -9,6 +9,7 @@ import {
   GetAgentActivityQueryParams,
 } from "@workspace/api-zod";
 import { crypto } from "../lib/stellarUtils.js";
+import { sorobanRegisterAgent } from "../lib/soroban.js";
 
 const router: IRouter = Router();
 
@@ -61,6 +62,12 @@ router.post("/agents", async (req, res): Promise<void> => {
       stellarAddress: parsed.data.stellarAddress,
     })
     .returning();
+
+  // Fire-and-forget: register agent in Soroban registry
+  if (agent && parsed.data.stellarAddress) {
+    sorobanRegisterAgent(parsed.data.stellarAddress, 100n).catch(() => {});
+  }
+
   res.status(201).json(formatAgent(agent!));
 });
 
