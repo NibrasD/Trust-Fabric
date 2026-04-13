@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;600;700;900&display=swap');
+@import "tailwindcss";
+
+:root {
+  --color-primary: #7B5FF5;
+  --color-secondary: #00D4AA;
+  --color-accent: #00D4AA;
+
+  --color-bg-light: #0a0e1a;
+  --color-bg-dark: #0a0e1a;
+  --color-bg-muted: #111827;
+
+  --color-text-primary: #E8EAFF;
+  --color-text-secondary: #E8EAFF;
+  --color-text-muted: #E8EAFF;
+  --color-text-inverse: #0a0e1a;
+
+  --color-success: #00D4AA;
+  --color-warning: #FF6B35;
+  --color-error: #FF6B35;
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-secondary: var(--color-secondary);
+  --color-accent: var(--color-accent);
+  --color-bg-light: var(--color-bg-light);
+  --color-bg-dark: var(--color-bg-dark);
+  --color-bg-muted: var(--color-bg-muted);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-inverse: var(--color-text-inverse);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-primary);
+}

@@ -1,5 +1,16 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "qgV9jxMVUnfJR1DrvT6dC"
+uri = "file://artifacts/demo-video/public/images/space_particles.png"
+type = "image"
+title = "abstract network space particles"
+
+[[generated]]
+id = "Fl2RNRJIDV_A5f49bL8JJ"
+uri = "file://artifacts/demo-video/public/images/dashboard_bg.png"
+type = "image"
+title = "dark futuristic dashboard UI texture"
 
 [[outputs]]
 id = "8fOHFcbdjDMZwe5sF4hTa"
