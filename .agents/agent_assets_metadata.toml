@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "8fOHFcbdjDMZwe5sF4hTa"
+uri = "file://README.md"
+type = "text"
+title = "Stellar Agent Trust Fabric — README"
