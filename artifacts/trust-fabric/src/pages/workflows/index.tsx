@@ -66,12 +66,22 @@ export default function WorkflowsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: {} }),
       });
-      const data: ExecutionResult = await r.json();
-      setExpandedResults((p) => ({ ...p, [wf.id]: data }));
-      if (data.status === "completed") {
-        toast({ title: `Workflow completed`, description: `${data.durationMs}ms — ${Object.keys(data.stepResults).length} steps` });
+      const data = await r.json();
+      if (!r.ok) {
+        const errMsg = data?.message ?? data?.error ?? `Server error ${r.status}`;
+        setExpandedResults((p) => ({
+          ...p,
+          [wf.id]: { executionId: 0, status: "failed", durationMs: 0, stepResults: {}, output: {}, error: errMsg },
+        }));
+        toast({ title: "Workflow failed", description: errMsg, variant: "destructive" });
+        return;
+      }
+      const result: ExecutionResult = data;
+      setExpandedResults((p) => ({ ...p, [wf.id]: result }));
+      if (result.status === "completed") {
+        toast({ title: `Workflow completed`, description: `${result.durationMs}ms — ${Object.keys(result.stepResults ?? {}).length} steps` });
       } else {
-        toast({ title: "Workflow failed", description: data.error ?? data.message, variant: "destructive" });
+        toast({ title: "Workflow failed", description: result.error ?? result.message, variant: "destructive" });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -193,7 +203,7 @@ export default function WorkflowsPage() {
                               Error: {result.error}
                             </div>
                           )}
-                          {Object.entries(result.stepResults).map(([stepId, sr], i) => {
+                          {Object.entries(result.stepResults ?? {}).map(([stepId, sr], i) => {
                             const stepDef = wf.steps?.find((s) => s.id === stepId);
                             return (
                               <div key={stepId} className="px-3 py-2 space-y-1 bg-background/60">

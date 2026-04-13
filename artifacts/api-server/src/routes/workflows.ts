@@ -101,7 +101,15 @@ router.post("/workflows/:id/execute", async (req, res): Promise<void> => {
     .returning();
 
   const stepResults: Record<string, unknown> = {};
-  let ctx: Record<string, unknown> = { ...input };
+
+  // Inject built-in context variables available in {{template}} interpolation
+  const apiBaseUrl = process.env.API_BASE_URL
+    ?? `http://localhost:${process.env.PORT ?? 8080}`;
+
+  let ctx: Record<string, unknown> = {
+    API_BASE: apiBaseUrl,
+    ...input,
+  };
   let error: string | undefined;
 
   try {
