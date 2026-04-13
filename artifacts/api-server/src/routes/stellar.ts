@@ -10,6 +10,8 @@
 
 import { Router, type IRouter } from "express";
 import { Keypair } from "@stellar/stellar-sdk";
+import { eq, and } from "drizzle-orm";
+import { db, sessionsTable } from "@workspace/db";
 import {
   createAndFundTestnetAccount,
   addUsdcTrustline,
@@ -28,6 +30,27 @@ import {
   server,
 } from "../lib/stellarPayments.js";
 import { sorobanStatus } from "../lib/soroban.js";
+
+async function validateSessionBudget(
+  sessionToken: string,
+  amountUsdc: number
+): Promise<{ session: typeof sessionsTable.$inferSelect; error?: never } | { error: string; session?: never }> {
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.sessionToken, sessionToken), eq(sessionsTable.status, "active")));
+
+  if (!session) return { error: "session_invalid: no active session found for this token" };
+  if (new Date(session.expiresAt) < new Date()) return { error: "session_expired: session has passed its expiry time" };
+
+  const remaining = Number(session.maxSpendUsdc) - Number(session.spentUsdc);
+  if (amountUsdc > remaining) {
+    return {
+      error: `session_budget_exceeded: this transaction requires ${amountUsdc} USDC but the session only has ${remaining.toFixed(7)} USDC remaining (limit: ${session.maxSpendUsdc})`,
+    };
+  }
+  return { session };
+}
 
 const router: IRouter = Router();
 
@@ -187,11 +210,12 @@ router.get("/stellar/account/:address/balance", async (req, res): Promise<void> 
  *   10% → protocol fee receiver (Trust Fabric)
  */
 router.post("/stellar/payment/build", async (req, res): Promise<void> => {
-  const { fromSecretKey, toAddress, amountUsdc, memo } = req.body as {
+  const { fromSecretKey, toAddress, amountUsdc, memo, sessionToken } = req.body as {
     fromSecretKey?: string;
     toAddress?: string;
     amountUsdc?: number;
     memo?: string;
+    sessionToken?: string;
   };
 
   if (!fromSecretKey || !toAddress || !amountUsdc) {
@@ -210,6 +234,22 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
   if (amountUsdc < 0.0001 || amountUsdc > 100) {
     res.status(400).json({ error: "invalid_amount", message: "amountUsdc must be between 0.0001 and 100" });
     return;
+  }
+
+  // Session validation — if a session token is provided, enforce its budget
+  let sessionContext: { id: number; remainingUsdc: number; expiresAt: string } | null = null;
+  if (sessionToken) {
+    const result = await validateSessionBudget(sessionToken, amountUsdc);
+    if (result.error) {
+      res.status(403).json({ error: "session_denied", message: result.error });
+      return;
+    }
+    const s = result.session!;
+    sessionContext = {
+      id: s.id,
+      remainingUsdc: Number(s.maxSpendUsdc) - Number(s.spentUsdc),
+      expiresAt: s.expiresAt.toISOString(),
+    };
   }
 
   try {
@@ -233,7 +273,10 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
         hasFeeRecipient: result.hasFeeRecipient,
       },
       network: "testnet",
-      instructions: "Sign and submit this XDR to Stellar Testnet, then use the tx hash as X-PAYMENT header",
+      sessionContext,
+      instructions: sessionToken
+        ? "Pass the same sessionToken when submitting to deduct from your session budget"
+        : "Sign and submit this XDR to Stellar Testnet, then use the tx hash as X-PAYMENT header",
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -248,11 +291,24 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
  * Returns the transaction hash to use as X-PAYMENT header.
  */
 router.post("/stellar/payment/submit", async (req, res): Promise<void> => {
-  const { xdr } = req.body as { xdr?: string };
+  const { xdr, sessionToken, amountUsdc } = req.body as {
+    xdr?: string;
+    sessionToken?: string;
+    amountUsdc?: number;
+  };
 
   if (!xdr) {
     res.status(400).json({ error: "bad_request", message: "xdr is required" });
     return;
+  }
+
+  // Re-validate session budget at submit time to prevent TOCTOU races
+  if (sessionToken && amountUsdc) {
+    const check = await validateSessionBudget(sessionToken, amountUsdc);
+    if (check.error) {
+      res.status(403).json({ error: "session_denied", message: check.error });
+      return;
+    }
   }
 
   try {
@@ -260,11 +316,33 @@ router.post("/stellar/payment/submit", async (req, res): Promise<void> => {
     const tx = TransactionBuilder.fromXDR(xdr, "Test SDF Network ; September 2015");
     const result = await server.submitTransaction(tx as Parameters<typeof server.submitTransaction>[0]);
 
+    // Deduct from session budget after confirmed on-chain submission
+    let sessionUpdate: { remainingUsdc: number; spentUsdc: number } | null = null;
+    if (sessionToken && amountUsdc) {
+      const [currentSession] = await db
+        .select()
+        .from(sessionsTable)
+        .where(and(eq(sessionsTable.sessionToken, sessionToken), eq(sessionsTable.status, "active")));
+      if (currentSession) {
+        const newSpent = Number(currentSession.spentUsdc) + amountUsdc;
+        const [updated] = await db
+          .update(sessionsTable)
+          .set({ spentUsdc: String(newSpent) })
+          .where(eq(sessionsTable.id, currentSession.id))
+          .returning();
+        sessionUpdate = {
+          spentUsdc: Number(updated!.spentUsdc),
+          remainingUsdc: Number(updated!.maxSpendUsdc) - Number(updated!.spentUsdc),
+        };
+      }
+    }
+
     res.json({
       txHash: result.hash,
       ledger: result.ledger,
       successful: true,
       explorerUrl: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
+      sessionUpdate,
       nextStep: "Use the txHash as your X-PAYMENT header to call protected endpoints",
     });
   } catch (err: unknown) {

@@ -22,6 +22,11 @@ import {
   Split,
   Network,
   ListChecks,
+  Key,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  TrendingDown,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -86,7 +91,25 @@ export default function StellarLab() {
     ledger?: number;
     successful: boolean;
     explorerUrl: string;
+    sessionUpdate?: { spentUsdc: number; remainingUsdc: number } | null;
   }>(null);
+
+  // Session Key state
+  const [sessionForm, setSessionForm] = useState({
+    agentId: "",
+    maxSpendUsdc: "1.00",
+    durationMinutes: "60",
+  });
+  const [activeSession, setActiveSession] = useState<null | {
+    id: string;
+    sessionToken: string;
+    agentName: string;
+    maxSpendUsdc: number;
+    spentUsdc: number;
+    expiresAt: string;
+    status: string;
+  }>(null);
+  const [sessionTokenInBuilder, setSessionTokenInBuilder] = useState("");
 
 
   // Network info
@@ -100,6 +123,12 @@ export default function StellarLab() {
   const { data: servicesData } = useQuery({
     queryKey: ["services-list"],
     queryFn: () => apiGet("/services"),
+  });
+
+  // Agents list for session creation
+  const { data: agentsData } = useQuery({
+    queryKey: ["agents-list"],
+    queryFn: () => apiGet("/agents"),
   });
 
   // x402 challenge from the actual service (returns 402, which we display)
@@ -143,11 +172,17 @@ export default function StellarLab() {
         toAddress: form.toAddress,
         amountUsdc: parseFloat(form.amountUsdc),
         memo: form.memo || undefined,
+        sessionToken: sessionTokenInBuilder || undefined,
       }),
     onSuccess: (data) => {
       setBuildResult(data as typeof buildResult);
       setXdrToSubmit((data as any).xdr);
-      toast({ title: "Transaction Built", description: "MPP split transaction ready for submission." });
+      const ctx = (data as any).sessionContext;
+      if (ctx) {
+        toast({ title: "Transaction Built", description: `Session approved — ${ctx.remainingUsdc.toFixed(4)} USDC remaining after this tx.` });
+      } else {
+        toast({ title: "Transaction Built", description: "MPP split transaction ready for submission." });
+      }
     },
     onError: (err) => {
       toast({ title: "Build failed", description: err.message, variant: "destructive" });
@@ -156,13 +191,58 @@ export default function StellarLab() {
 
   // Submit tx mutation
   const submitMutation = useMutation({
-    mutationFn: (xdr: string) => apiPost("/stellar/payment/submit", { xdr }),
+    mutationFn: (xdr: string) =>
+      apiPost("/stellar/payment/submit", {
+        xdr,
+        sessionToken: sessionTokenInBuilder || undefined,
+        amountUsdc: buildResult?.amountUsdc ?? undefined,
+      }),
     onSuccess: (data) => {
       setSubmitResult(data as typeof submitResult);
-      toast({ title: "Transaction Submitted", description: "Payment confirmed on Stellar Testnet." });
+      if ((data as any).sessionUpdate) {
+        const su = (data as any).sessionUpdate;
+        setActiveSession((prev) =>
+          prev ? { ...prev, spentUsdc: su.spentUsdc } : prev
+        );
+        toast({ title: "Transaction Submitted", description: `Budget deducted — ${su.remainingUsdc.toFixed(4)} USDC remaining in session.` });
+      } else {
+        toast({ title: "Transaction Submitted", description: "Payment confirmed on Stellar Testnet." });
+      }
     },
     onError: (err) => {
       toast({ title: "Submission failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Create session mutation
+  const createSessionMutation = useMutation({
+    mutationFn: (form: typeof sessionForm) =>
+      apiPost("/sessions", {
+        agentId: form.agentId,
+        maxSpendUsdc: parseFloat(form.maxSpendUsdc),
+        durationMinutes: parseInt(form.durationMinutes),
+        allowedEndpoints: ["/api/services/paid/summarize"],
+      }),
+    onSuccess: (data: any) => {
+      setActiveSession(data);
+      setSessionTokenInBuilder(data.sessionToken);
+      toast({ title: "Session Created", description: `Token pre-loaded in builder — budget: ${data.maxSpendUsdc} USDC.` });
+    },
+    onError: (err) => {
+      toast({ title: "Session creation failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Revoke session mutation
+  const revokeSessionMutation = useMutation({
+    mutationFn: (sessionId: string) => apiPost(`/sessions/${sessionId}/revoke`, {}),
+    onSuccess: () => {
+      setActiveSession(null);
+      setSessionTokenInBuilder("");
+      toast({ title: "Session Revoked", description: "The session has been closed." });
+    },
+    onError: (err) => {
+      toast({ title: "Revoke failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -310,6 +390,155 @@ export default function StellarLab() {
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">Could not load x402 challenge.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Session Key Manager */}
+      <Card className={activeSession ? "border-primary/40" : ""}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5 text-primary" />
+            Session Key
+            {activeSession && (
+              <Badge variant="outline" className="ml-auto text-green-400 border-green-700">
+                Active
+              </Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Authorize a scoped spending session for an agent. Payments without a session token bypass budget enforcement — create one to lock down the builder.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!activeSession ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Agent</Label>
+                  <Select
+                    value={sessionForm.agentId}
+                    onValueChange={(v) => setSessionForm(f => ({ ...f, agentId: v }))}
+                  >
+                    <SelectTrigger className="text-xs">
+                      <SelectValue placeholder="Select agent..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {((agentsData as any)?.agents ?? []).map((a: any) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Spend (USDC)</Label>
+                  <Input
+                    type="number"
+                    step="0.10"
+                    min="0.01"
+                    value={sessionForm.maxSpendUsdc}
+                    onChange={(e) => setSessionForm(f => ({ ...f, maxSpendUsdc: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Duration (minutes)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    value={sessionForm.durationMinutes}
+                    onChange={(e) => setSessionForm(f => ({ ...f, durationMinutes: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-900/10 border border-yellow-700/20 text-xs text-yellow-600">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>Without an active session, the payment builder allows unlimited transactions. Create a session to enforce spend limits.</span>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => createSessionMutation.mutate(sessionForm)}
+                disabled={createSessionMutation.isPending || !sessionForm.agentId}
+              >
+                {createSessionMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating Session...</>
+                ) : (
+                  <><Lock className="mr-2 h-4 w-4" /> Create Session & Lock Builder</>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Active session details */}
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Agent</Label>
+                  <p className="text-sm font-medium">{activeSession.agentName}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Expires</Label>
+                  <p className="text-sm font-mono">{new Date(activeSession.expiresAt).toLocaleTimeString()}</p>
+                </div>
+              </div>
+
+              {/* Budget bar */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <Label className="text-muted-foreground">Budget Used</Label>
+                  <span className="font-mono">
+                    {activeSession.spentUsdc.toFixed(4)} / {activeSession.maxSpendUsdc} USDC
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${Math.min(100, (activeSession.spentUsdc / activeSession.maxSpendUsdc) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {(activeSession.maxSpendUsdc - activeSession.spentUsdc).toFixed(4)} USDC remaining
+                </p>
+              </div>
+
+              {/* Session token */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Session Token (active in builder)</Label>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-[10px] break-all flex-1 bg-muted rounded px-2 py-1">
+                    {activeSession.sessionToken}
+                  </p>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => copyToClipboard(activeSession.sessionToken)}>
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-green-500 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Token is pre-loaded in the payment builder below
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setSessionTokenInBuilder(activeSession.sessionToken)}
+                >
+                  <Unlock className="mr-1.5 h-3.5 w-3.5" /> Re-link to Builder
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => revokeSessionMutation.mutate(activeSession.id)}
+                  disabled={revokeSessionMutation.isPending}
+                >
+                  {revokeSessionMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <XCircle className="mr-1.5 h-3.5 w-3.5" />}
+                  Revoke Session
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -536,6 +765,27 @@ export default function StellarLab() {
             </div>
           </div>
 
+          {/* Session status indicator */}
+          {sessionTokenInBuilder ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-900/10 border border-green-700/20 text-xs text-green-500">
+              <Lock className="h-3.5 w-3.5 shrink-0" />
+              <span>Session active — budget enforcement on. Tx will be rejected if it exceeds the session limit.</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-5 px-2 text-[10px] text-muted-foreground hover:text-red-400"
+                onClick={() => setSessionTokenInBuilder("")}
+              >
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted text-xs text-muted-foreground">
+              <Unlock className="h-3.5 w-3.5 shrink-0" />
+              <span>No session — payment will bypass budget enforcement. Create a session above to enable limits.</span>
+            </div>
+          )}
+
           <Button
             className="w-full"
             onClick={() => buildPaymentMutation.mutate(buildForm)}
@@ -640,6 +890,15 @@ export default function StellarLab() {
                   >
                     View on Stellar Expert <ExternalLink className="h-3 w-3" />
                   </a>
+                </div>
+              )}
+              {submitResult.sessionUpdate && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-900/10 border border-blue-700/20 text-xs text-blue-400">
+                  <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Session budget deducted — {submitResult.sessionUpdate.spentUsdc.toFixed(4)} USDC spent,{" "}
+                    {submitResult.sessionUpdate.remainingUsdc.toFixed(4)} USDC remaining
+                  </span>
                 </div>
               )}
             </div>
