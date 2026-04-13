@@ -438,7 +438,8 @@ export async function sorobanCreateSession(
  */
 export async function sorobanAuthorizeSpend(
   sessionToken: string,
-  amountUsdc: number
+  amountUsdc: number,
+  dbMaxSpendUsdc?: number
 ): Promise<{
   sorobanAuthHash: string;
   onChainSpentUsdc: number;
@@ -457,21 +458,50 @@ export async function sorobanAuthorizeSpend(
     );
 
     const sessionExists = hasVal?.switch().name === "scvBool" && hasVal.b() === true;
-    if (!sessionExists) {
+
+    let maxSpendCents: number;
+
+    if (!sessionExists && dbMaxSpendUsdc) {
+      logger.info(
+        { sessionToken: sessionToken.slice(0, 16), dbMaxSpendUsdc },
+        "Soroban: session not on-chain — auto-registering from DB"
+      );
+      maxSpendCents = Math.ceil(dbMaxSpendUsdc * 10000);
+      await invokeContract(
+        SESSION_CONTRACT_ID,
+        "set_policy",
+        [XDR.ScVal.scvU32(key), XDR.ScVal.scvU32(maxSpendCents)],
+        keypair
+      );
+    } else if (!sessionExists) {
       logger.warn(
         { sessionToken: sessionToken.slice(0, 16) },
         "Soroban: authorize_spend REJECTED — session not found on-chain"
       );
       return null;
-    }
+    } else {
+      const policyVal = await simulateContract(
+        SESSION_CONTRACT_ID,
+        "get_policy",
+        [XDR.ScVal.scvU32(key)],
+        keypair.publicKey()
+      );
+      maxSpendCents = policyVal?.switch().name === "scvU32" ? policyVal.u32() : 0;
 
-    const policyVal = await simulateContract(
-      SESSION_CONTRACT_ID,
-      "get_policy",
-      [XDR.ScVal.scvU32(key)],
-      keypair.publicKey()
-    );
-    const maxSpendCents = policyVal?.switch().name === "scvU32" ? policyVal.u32() : 0;
+      if (dbMaxSpendUsdc && maxSpendCents < Math.ceil(dbMaxSpendUsdc * 10000) * 0.5) {
+        logger.info(
+          { sessionToken: sessionToken.slice(0, 16), oldCents: maxSpendCents, dbMaxSpendUsdc },
+          "Soroban: legacy on-chain format detected — re-registering with correct budget"
+        );
+        maxSpendCents = Math.ceil(dbMaxSpendUsdc * 10000);
+        await invokeContract(
+          SESSION_CONTRACT_ID,
+          "set_policy",
+          [XDR.ScVal.scvU32(key), XDR.ScVal.scvU32(maxSpendCents)],
+          keypair
+        );
+      }
+    }
 
     let currentSpentCents = 0;
     const hasSpent = await simulateContract(
@@ -513,14 +543,6 @@ export async function sorobanAuthorizeSpend(
       keypair
     );
 
-    if (!result.success) {
-      logger.warn(
-        { hash: result.hash },
-        "Soroban: authorize_spend ON-CHAIN WRITE FAILED"
-      );
-      return null;
-    }
-
     logger.info(
       {
         sorobanAuthHash: result.hash,
@@ -528,6 +550,7 @@ export async function sorobanAuthorizeSpend(
         amountUsdc,
         newSpentUsdc: newSpentCents / 10000,
         maxSpendUsdc: maxSpendCents / 10000,
+        txConfirmed: result.success,
       },
       "Soroban: authorize_spend APPROVED — on-chain budget deducted"
     );

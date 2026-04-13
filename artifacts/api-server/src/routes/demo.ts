@@ -177,7 +177,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
   // ── Step 4: Soroban On-Chain Authorization ───────────────────────────────
   let sorobanAuthHash: string | null = null;
   if (existingSession) {
-    const sorobanAuth = await sorobanAuthorizeSpend(existingSession.sessionToken, amountUsdc);
+    const sorobanAuth = await sorobanAuthorizeSpend(existingSession.sessionToken, amountUsdc, Number(existingSession.maxSpendUsdc));
     if (sorobanAuth) {
       sorobanAuthHash = sorobanAuth.sorobanAuthHash;
       steps.push({

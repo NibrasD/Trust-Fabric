@@ -258,7 +258,7 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
   };
 
   try {
-    const sorobanAuth = await sorobanAuthorizeSpend(sessionToken, amountUsdc);
+    const sorobanAuth = await sorobanAuthorizeSpend(sessionToken, amountUsdc, Number(s.maxSpendUsdc));
     if (!sorobanAuth) {
       res.status(403).json({
         error: "soroban_authorization_failed",

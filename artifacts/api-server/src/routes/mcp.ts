@@ -183,7 +183,7 @@ async function callTool(
         return null;
       }
 
-      const sorobanAuth = await sorobanAuthorizeSpend(session.sessionToken, amountUsdc);
+      const sorobanAuth = await sorobanAuthorizeSpend(session.sessionToken, amountUsdc, Number(session.maxSpendUsdc));
       if (!sorobanAuth) {
         logger.warn({ tool: name, agentId: agent.id }, "MCP auto-pay blocked: soroban_authorization_denied — on-chain session contract rejected this spend");
         return null;
