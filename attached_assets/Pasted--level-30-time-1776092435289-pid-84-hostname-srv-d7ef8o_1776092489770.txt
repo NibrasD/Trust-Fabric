@@ -1,0 +1,18 @@
+{"level":30,"time":1776092435289,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":16,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092439661,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-5446fd964f-25k6s","req":{"id":96,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":0,"msg":"request completed"}
+{"level":30,"time":1776092440290,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":17,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+/opt/render/project/src/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Command failed with signal "SIGTERM"
+{"level":30,"time":1776092445176,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-858fccb989-4mq4c","req":{"id":4,"method":"GET","url":"/api/health"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092445289,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":18,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092450289,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":19,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092455176,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-858fccb989-4mq4c","req":{"id":5,"method":"GET","url":"/api/health"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092455291,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":20,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776092460284,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":21,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776092460288,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":22,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092465177,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-858fccb989-4mq4c","req":{"id":6,"method":"GET","url":"/api/health"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776092465289,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":23,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092470289,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":24,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092475289,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":25,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776092480288,"pid":84,"hostname":"srv-d7ef8o77f7vs73ehj6eg-7c9d8cff54-2pzld","req":{"id":26,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":0,"msg":"request completed"}
