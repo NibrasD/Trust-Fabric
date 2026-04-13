@@ -172,10 +172,16 @@ router.post(
 
     const { paymentsTable, agentsTable } = await import("@workspace/db");
 
+    // Accept agentId as numeric DB id OR as a Stellar address
+    const numericId = Number(agentId);
     const [agent] = await db
       .select()
       .from(agentsTable)
-      .where(eq(agentsTable.id, Number(agentId)));
+      .where(
+        isNaN(numericId)
+          ? eq(agentsTable.stellarAddress, agentId)
+          : eq(agentsTable.id, numericId)
+      );
 
     if (!agent) {
       res.status(404).json({ error: "not_found", message: "Agent not found" });
@@ -197,7 +203,7 @@ router.post(
     const [payment] = await db
       .insert(paymentsTable)
       .values({
-        agentId: Number(agentId),
+        agentId: agent.id,
         serviceId,
         amountUsdc: "0.10",
         txHash,

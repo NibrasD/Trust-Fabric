@@ -13,12 +13,14 @@ import { Keypair } from "@stellar/stellar-sdk";
 import {
   createAndFundTestnetAccount,
   addUsdcTrustline,
+  seedUsdcToAccount,
   getAccountBalances,
   buildMppPaymentTransaction,
   verifyPayment,
   isValidStellarAddress,
   getPaymentAsset,
   getAssetDisplayName,
+  parseHorizonError,
   HORIZON_URL,
   PROTOCOL_FEE_ADDRESS,
   PROTOCOL_FEE_ADDRESS_DISPLAY,
@@ -108,13 +110,26 @@ router.post("/stellar/account/create", async (req, res): Promise<void> => {
     req.log.info("Creating new Stellar Testnet account via Friendbot");
     const { publicKey, secretKey } = await createAndFundTestnetAccount();
 
-    // Add USDC trustline so the account can receive USDC
     const keypair = Keypair.fromSecret(secretKey);
     let trustlineTxHash: string | null = null;
+    let seedTxHash: string | null = null;
+
+    // Add USDC trustline so the account can receive USDC
     try {
       trustlineTxHash = await addUsdcTrustline(keypair);
+      req.log.info({ publicKey }, "USDC trustline added");
     } catch (trustErr) {
-      req.log.warn({ err: trustErr }, "Failed to add USDC trustline (account may need XLM first)");
+      req.log.warn({ err: trustErr }, "Failed to add USDC trustline");
+    }
+
+    // Seed 10 USDC from faucet so the account can make payments immediately
+    if (trustlineTxHash && trustlineTxHash !== "trustline_exists") {
+      try {
+        seedTxHash = await seedUsdcToAccount(publicKey, 10);
+        req.log.info({ publicKey, seedTxHash }, "Seeded 10 USDC to new account");
+      } catch (seedErr) {
+        req.log.warn({ err: seedErr }, "Failed to seed USDC to new account");
+      }
     }
 
     const balances = await getAccountBalances(publicKey);
@@ -126,6 +141,8 @@ router.post("/stellar/account/create", async (req, res): Promise<void> => {
       friendbotFunded: true,
       usdcTrustlineAdded: !!trustlineTxHash,
       trustlineTxHash,
+      usdcSeeded: !!seedTxHash,
+      seedTxHash,
       balances,
       horizonUrl: `https://stellar.expert/explorer/testnet/account/${publicKey}`,
       warning: "This secret key is shown once. Store it securely. Never share it.",
@@ -251,9 +268,20 @@ router.post("/stellar/payment/submit", async (req, res): Promise<void> => {
       nextStep: "Use the txHash as your X-PAYMENT header to call protected endpoints",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    req.log.error({ error: message }, "Failed to submit Stellar transaction");
-    res.status(500).json({ error: "submission_failed", message });
+    const parsed = parseHorizonError(err);
+    req.log.error({ error: parsed.message, resultCodes: parsed.resultCodes }, "Failed to submit Stellar transaction");
+    res.status(400).json({
+      error: "submission_failed",
+      message: parsed.message,
+      resultCodes: parsed.resultCodes,
+      hint: parsed.resultCodes?.includes("op_underfunded")
+        ? "Your account does not have enough USDC. Create a new account to get 10 USDC, or use the admin secret key."
+        : parsed.resultCodes?.includes("op_no_trust")
+        ? "The recipient account does not have a USDC trustline. Ask them to add one first."
+        : parsed.resultCodes?.includes("tx_bad_seq")
+        ? "This transaction was already submitted. Build a new one."
+        : undefined,
+    });
   }
 });
 

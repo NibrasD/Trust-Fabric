@@ -381,9 +381,12 @@ export default function StellarLab() {
                     <span className="text-muted-foreground">XLM</span>
                     <p className="font-mono font-bold">{createdAccount.balances.xlm}</p>
                   </div>
-                  <div className="bg-muted rounded p-2">
+                  <div className={`rounded p-2 ${(createdAccount as any).usdcSeeded ? "bg-green-900/20 border border-green-800/30" : "bg-muted"}`}>
                     <span className="text-muted-foreground">USDC</span>
-                    <p className="font-mono font-bold">{createdAccount.balances.usdc}</p>
+                    <p className="font-mono font-bold text-green-400">{createdAccount.balances.usdc || "0"}</p>
+                    {(createdAccount as any).usdcSeeded && (
+                      <p className="text-[9px] text-green-500 mt-0.5">10 USDC seeded from faucet</p>
+                    )}
                   </div>
                 </div>
                 <a

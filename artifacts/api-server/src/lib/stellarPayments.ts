@@ -247,11 +247,15 @@ export async function verifyPayment(params: {
         if (!isMatchingAsset) continue;
 
         const amount = parseFloat(op.amount ?? "0");
-        if (amount < expectedMinAmountUsdc) {
+        // For MPP payments, service receives (1 - protocolFee) fraction of the total.
+        // Accept if amount ≥ (expectedMin * 0.9) to allow for MPP protocol fee split.
+        // Round to 7 decimal places (Stellar stroops precision) to avoid floating-point artifacts.
+        const minAcceptable = Math.round(expectedMinAmountUsdc * (1 - PROTOCOL_FEE_FRACTION) * 1e7) / 1e7;
+        if (amount < minAcceptable) {
           return {
             valid: false,
             txHash: hash,
-            error: `Insufficient payment: ${amount} ${getAssetDisplayName()} < ${expectedMinAmountUsdc} required`,
+            error: `Insufficient payment: ${amount} ${getAssetDisplayName()} < ${minAcceptable.toFixed(7)} required (${expectedMinAmountUsdc} minus 10% protocol fee)`,
           };
         }
 
@@ -456,4 +460,93 @@ export function isValidStellarAddress(address: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Seed a new testnet account with USDC from the faucet issuer.
+ * The faucet account (STELLAR_FAUCET_SECRET) is the USDC issuer — it can
+ * send USDC to any account that has a trustline set up.
+ * 
+ * Returns the seeding transaction hash or null if not configured.
+ */
+export async function seedUsdcToAccount(
+  recipientPublicKey: string,
+  amountUsdc: number = 10
+): Promise<string | null> {
+  const faucetSecret = process.env.STELLAR_FAUCET_SECRET;
+  if (!faucetSecret) {
+    logger.warn("STELLAR_FAUCET_SECRET not set — skipping USDC seed");
+    return null;
+  }
+
+  const asset = getPaymentAsset();
+  if (asset.isNative()) {
+    logger.info("Payment asset is XLM — no USDC seeding needed");
+    return null;
+  }
+
+  try {
+    const faucetKeypair = Keypair.fromSecret(faucetSecret);
+    const faucetAccount = await server.loadAccount(faucetKeypair.publicKey());
+
+    const tx = new TransactionBuilder(faucetAccount, {
+      fee: BASE_FEE,
+      networkPassphrase: STELLAR_PASSPHRASE,
+    })
+      .addOperation(
+        Operation.payment({
+          destination: recipientPublicKey,
+          asset,
+          amount: amountUsdc.toFixed(7),
+        })
+      )
+      .addMemo(Memo.text("stf-faucet"))
+      .setTimeout(300)
+      .build();
+
+    tx.sign(faucetKeypair);
+    const result = await server.submitTransaction(tx);
+    logger.info(
+      { recipient: recipientPublicKey, amount: amountUsdc, txHash: result.hash },
+      "Seeded USDC to new account from faucet"
+    );
+    return result.hash;
+  } catch (err) {
+    logger.error({ err }, "Failed to seed USDC — faucet may be out of balance");
+    return null;
+  }
+}
+
+/**
+ * Parse a Horizon submission error and return human-readable result codes.
+ */
+export function parseHorizonError(err: unknown): {
+  message: string;
+  resultCodes?: string[];
+  extras?: unknown;
+} {
+  if (err instanceof Error) {
+    // Stellar SDK wraps Horizon errors in the error.response.data
+    const anyErr = err as any;
+    const extras = anyErr?.response?.data?.extras;
+    if (extras?.result_codes) {
+      const codes = [
+        extras.result_codes.transaction,
+        ...(extras.result_codes.operations ?? []),
+      ].filter(Boolean);
+      const messages: Record<string, string> = {
+        tx_bad_seq: "Transaction sequence number is invalid (duplicate submission?)",
+        tx_failed: "Transaction failed to execute",
+        op_no_trust: "Recipient has no USDC trustline — they must add one first",
+        op_underfunded: "Insufficient USDC balance to complete this payment",
+        op_bad_auth: "Missing or invalid signature",
+        op_src_no_trust: "Sender has no USDC trustline",
+        op_self_payment: "Cannot send payment to self",
+      };
+      const readable = codes.map((c) => messages[c] ?? c).join("; ");
+      return { message: readable, resultCodes: codes, extras };
+    }
+    return { message: err.message };
+  }
+  return { message: String(err) };
 }
