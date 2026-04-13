@@ -102,9 +102,8 @@ router.post("/workflows/:id/execute", async (req, res): Promise<void> => {
 
   const stepResults: Record<string, unknown> = {};
 
-  // Inject built-in context variables available in {{template}} interpolation
-  const apiBaseUrl = process.env.API_BASE_URL
-    ?? `http://localhost:${process.env.PORT ?? 8080}`;
+  // Always use localhost for self-calls — external URL doesn't work on Render
+  const apiBaseUrl = `http://localhost:${process.env.PORT ?? 8080}`;
 
   let ctx: Record<string, unknown> = {
     API_BASE: apiBaseUrl,
