@@ -7,7 +7,7 @@ import {
   PROTOCOL_FEE_ADDRESS,
   PROTOCOL_FEE_FRACTION,
 } from "../lib/stellarPayments.js";
-import { randomBytes } from "crypto";
+
 
 const router: IRouter = Router();
 
@@ -63,8 +63,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     )
     .limit(1);
 
-  let sessionId: number;
-  let sessionToken: string;
+  let sessionId: number | undefined;
   let sessionWasNew = false;
 
   const sessionEndpoints: string[] = existingSession?.allowedEndpoints ?? [];
@@ -77,7 +76,6 @@ router.post("/demo/run", async (req, res): Promise<void> => {
   if (existingSession && endpointAllowed && withinBudget) {
     // Re-use the existing session
     sessionId = existingSession.id;
-    sessionToken = existingSession.sessionToken;
     steps.push({
       step: "session_check",
       status: "success",
@@ -91,39 +89,33 @@ router.post("/demo/run", async (req, res): Promise<void> => {
         expiresAt: existingSession.expiresAt.toISOString(),
       },
     });
-  } else {
-    // Create a new scoped session for this demo run (expires in 1 hour)
-    sessionToken = "stf_demo_" + randomBytes(16).toString("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    const maxSpend = amountUsdc * 20; // allow up to 20 calls
-
-    const [newSession] = await db
-      .insert(sessionsTable)
-      .values({
-        agentId: agent.id,
-        sessionToken,
-        maxSpendUsdc: String(maxSpend),
-        spentUsdc: "0",
-        allowedEndpoints: [svc.endpoint],
-        expiresAt,
-        status: "active",
-      })
-      .returning();
-
-    sessionId = newSession!.id;
-    sessionWasNew = true;
-
+  } else if (existingSession && (!endpointAllowed || !withinBudget)) {
+    // Session exists but blocked — report why and continue without session
+    sessionWasNew = false;
+    const reason = !endpointAllowed
+      ? `endpoint ${svc.endpoint} not in session allowlist`
+      : `spend limit reached (${Number(existingSession.spentUsdc).toFixed(4)} / ${Number(existingSession.maxSpendUsdc).toFixed(4)} USDC)`;
     steps.push({
       step: "session_check",
-      status: "success",
-      message: `New scoped session created — max spend ${maxSpend.toFixed(4)} USDC, endpoint ${svc.endpoint} whitelisted`,
+      status: "skipped",
+      message: `Session policy denied — ${reason}. Proceeding with payment-only access.`,
       data: {
-        sessionId: String(sessionId),
-        sessionToken: sessionToken.slice(0, 24) + "...",
-        maxSpendUsdc: maxSpend,
-        allowedEndpoints: [svc.endpoint],
-        expiresAt: expiresAt.toISOString(),
-        isNew: true,
+        sessionId: String(existingSession.id),
+        denied: true,
+        reason,
+        fallback: "payment_only",
+      },
+    });
+  } else {
+    // No active session — proceed with payment-only access (no session needed)
+    steps.push({
+      step: "session_check",
+      status: "skipped",
+      message: `No active session for this agent — open access via payment. Create a session in Sessions Manager to enforce spend limits and endpoint policies.`,
+      data: {
+        sessionFound: false,
+        fallback: "payment_only",
+        hint: "Visit /sessions to create a scoped session for this agent",
       },
     });
   }
@@ -163,7 +155,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     .values({
       agentId: Number(agentId),
       serviceId: Number(serviceId),
-      sessionId,
+      ...(sessionId != null ? { sessionId } : {}),
       amountUsdc: String(amountUsdc),
       txHash,
       fromAddress: agent.stellarAddress,
@@ -172,12 +164,14 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     })
     .returning();
 
-  // Update session spentUsdc
-  const prevSpent = existingSession && !sessionWasNew ? Number(existingSession.spentUsdc) : 0;
-  await db
-    .update(sessionsTable)
-    .set({ spentUsdc: String(prevSpent + amountUsdc) })
-    .where(eq(sessionsTable.id, sessionId));
+  // Update session spentUsdc (only if a session was used)
+  if (sessionId != null) {
+    const prevSpent = existingSession && !sessionWasNew ? Number(existingSession.spentUsdc) : 0;
+    await db
+      .update(sessionsTable)
+      .set({ spentUsdc: String(prevSpent + amountUsdc) })
+      .where(eq(sessionsTable.id, sessionId));
+  }
 
   // Update agent totals
   await db
@@ -207,7 +201,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       toAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS,
       network: "testnet",
       verifiedOnChain: false,
-      sessionId: String(sessionId),
+      ...(sessionId != null ? { sessionId: String(sessionId) } : { sessionId: null }),
       paymentId: String(payment!.id),
       stellarExplorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
     },
