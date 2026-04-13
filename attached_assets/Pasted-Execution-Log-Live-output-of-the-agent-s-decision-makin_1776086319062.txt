@@ -1,0 +1,78 @@
+Execution Log
+Live output of the agent's decision making process.
+SERVICE DISCOVERY
+Agent "Demo Agent" discovered service "AI Summarizer" in the registry
+
+{
+  "agentAddress": "GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB",
+  "serviceEndpoint": "/api/services/paid/summarize",
+  "priceUsdc": 0.1,
+  "serviceReputation": 80
+}
+SESSION CHECK
+Active session found — endpoint /api/services/paid/summarize whitelisted, 4.9500 USDC remaining
+
+{
+  "sessionId": "1",
+  "sessionToken": "stf_6e2eb54e6dfa816d...",
+  "maxSpendUsdc": 5,
+  "spentUsdc": 0.05,
+  "allowedEndpoints": [
+    "/api/services/paid/summarize",
+    "/api/services/market/data",
+    "/api/services/sentiment"
+  ],
+  "expiresAt": "2026-04-13T13:52:22.633Z"
+}
+X402 REQUEST
+Agent sent HTTP request to /api/services/paid/summarize — received 402 Payment Required
+
+{
+  "httpStatus": 402,
+  "x402Version": 1,
+  "requiredAmount": "0.100000 USDC",
+  "network": "stellar-testnet",
+  "payTo": "GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB",
+  "asset": "USDC:GAIMP3OBUBK6Y72YGV3ZQJKRVQE5KH3VAIOG5QG2AB3VJCPQPBC4F3QP",
+  "mppEnabled": true,
+  "protocolFeeAddress": "GAIMP3OBUBK6Y72YGV3ZQJKRVQE5KH3VAIOG5QG2AB3VJCPQPBC4F3QP",
+  "protocolFeeFraction": 0.1
+}
+PAYMENT CONFIRMED
+MPP payment of 0.1 USDC split and confirmed on Stellar Testnet
+
+{
+  "txHash": "31373736303836323332363930dc408022fdf7e",
+  "totalUsdc": 0.1,
+  "serviceAmount": "0.0900000",
+  "protocolFee": "0.0100000",
+  "fromAddress": "GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB",
+  "toAddress": "GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB",
+  "network": "testnet",
+  "verifiedOnChain": false,
+  "sessionId": "1",
+  "paymentId": "31",
+  "stellarExplorerUrl": "https://stellar.expert/explorer/testnet/tx/31373736303836323332363930dc408022fdf7e"
+}
+SERVICE EXECUTED
+Service returned response — access granted after payment verification
+
+{
+  "summary": "Stellar is an open-source, decentralized protocol for digital currency to fiat money low-cost transfers which allows cross-border transactions between any pair of currencies.  The Stellar protocol is supported by a non-profit organization, the Stellar Development Foundation.",
+  "wordCount": 36,
+  "httpStatus": 200
+}
+REPUTATION UPDATED
+Agent rated 4/5 stars — on-chain reputation updated by +0.24 points
+
+{
+  "stars": 4,
+  "reputationDelta": 0.24,
+  "previousScore": 9.07,
+  "newScore": 9.31
+}
+Result Summary
+Agent "Demo Agent" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid 0.1 USDC on Stellar Testnet (tx: 3137373630383632...), received service output, and earned 4/5 stars, updating its reputation score to 9.31.
+
+313737363038...2fdf7e
+Reputation: 9.31

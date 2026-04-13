@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { randomBytes } from "crypto";
 import { eq, and, gt } from "drizzle-orm";
 import { db, agentsTable, servicesTable, paymentsTable, ratingsTable, sessionsTable } from "@workspace/db";
 import { RunDemoAgentBody } from "@workspace/api-zod";
@@ -165,7 +166,8 @@ router.post("/demo/run", async (req, res): Promise<void> => {
   });
 
   // ── Step 4: Payment ───────────────────────────────────────────────────────
-  const txHash = `${Buffer.from(Date.now().toString()).toString("hex").slice(0, 32)}${Math.random().toString(16).slice(2, 34)}`;
+  // Generate a proper 64-char hex hash (same format as real Stellar tx hashes)
+  const txHash = randomBytes(32).toString("hex");
   const serviceAmount = (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7);
   const feeAmount = (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7);
 
