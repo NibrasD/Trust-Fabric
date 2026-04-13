@@ -240,13 +240,30 @@ export default function DemoLab() {
                     </h4>
                     <p>{demoResult.summary}</p>
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      <span
-                        className="font-mono text-xs border border-border rounded px-2 py-0.5 text-muted-foreground cursor-default select-all"
-                        title={demoResult.txHash}
-                      >
-                        {truncateHash(demoResult.txHash)}
-                      </span>
-                      <Badge variant="outline" className="text-[10px] text-yellow-500 border-yellow-500/40">Simulated</Badge>
+                      {demoResult.verified ? (
+                        <a
+                          href={demoResult.stellarExplorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-xs border border-green-500/40 rounded px-2 py-0.5 text-green-400 hover:bg-green-500/10 transition-colors"
+                          title="View on Stellar Expert"
+                        >
+                          {truncateHash(demoResult.txHash)}
+                          <ArrowRight className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span
+                          className="font-mono text-xs border border-border rounded px-2 py-0.5 text-muted-foreground cursor-default select-all"
+                          title={demoResult.txHash}
+                        >
+                          {truncateHash(demoResult.txHash)}
+                        </span>
+                      )}
+                      {demoResult.verified ? (
+                        <Badge variant="outline" className="text-[10px] text-green-500 border-green-500/40">Verified On-Chain</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-yellow-500 border-yellow-500/40">Simulated</Badge>
+                      )}
                       <Badge className="bg-primary text-primary-foreground">Reputation: {demoResult.finalReputationScore}</Badge>
                     </div>
                   </div>

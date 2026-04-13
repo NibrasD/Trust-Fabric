@@ -1,13 +1,20 @@
 import { Router, type IRouter } from "express";
 import { randomBytes } from "crypto";
+import { Keypair } from "@stellar/stellar-sdk";
 import { eq, and, gt } from "drizzle-orm";
 import { db, agentsTable, servicesTable, paymentsTable, ratingsTable, sessionsTable } from "@workspace/db";
 import { RunDemoAgentBody } from "@workspace/api-zod";
 import {
   buildX402Challenge,
+  buildMppPaymentTransaction,
   PROTOCOL_FEE_ADDRESS,
   PROTOCOL_FEE_FRACTION,
+  server as horizonServer,
 } from "../lib/stellarPayments.js";
+
+// Demo agent keypair — funded with testnet USDC, signs all demo payments
+const DEMO_AGENT_SECRET = process.env.DEMO_AGENT_SECRET;
+const demoKeypair = DEMO_AGENT_SECRET ? Keypair.fromSecret(DEMO_AGENT_SECRET) : null;
 
 
 const router: IRouter = Router();
@@ -166,10 +173,36 @@ router.post("/demo/run", async (req, res): Promise<void> => {
   });
 
   // ── Step 4: Payment ───────────────────────────────────────────────────────
-  // Generate a proper 64-char hex hash (same format as real Stellar tx hashes)
-  const txHash = randomBytes(32).toString("hex");
+  let txHash: string;
+  let verifiedOnChain = false;
   const serviceAmount = (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7);
   const feeAmount = (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7);
+
+  if (demoKeypair) {
+    // Real Stellar testnet payment via demo agent keypair
+    try {
+      const { xdr } = await buildMppPaymentTransaction({
+        fromKeypair: demoKeypair,
+        serviceAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS ?? demoKeypair.publicKey(),
+        amountUsdc,
+        memo: `stf-x402-demo`,
+      });
+      const { TransactionBuilder } = await import("@stellar/stellar-sdk");
+      const { STELLAR_PASSPHRASE } = await import("../lib/stellarPayments.js");
+      const tx = TransactionBuilder.fromXDR(xdr, STELLAR_PASSPHRASE);
+      const result = await horizonServer.submitTransaction(tx as Parameters<typeof horizonServer.submitTransaction>[0]);
+      txHash = result.hash;
+      verifiedOnChain = true;
+    } catch (payErr: any) {
+      // Fallback to simulated if real payment fails (e.g. insufficient balance)
+      txHash = randomBytes(32).toString("hex");
+      verifiedOnChain = false;
+    }
+  } else {
+    // No demo keypair configured — simulated payment
+    txHash = randomBytes(32).toString("hex");
+    verifiedOnChain = false;
+  }
 
   const [payment] = await db
     .insert(paymentsTable)
@@ -209,19 +242,25 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     .set({ totalCalls: svc.totalCalls + 1 })
     .where(eq(servicesTable.id, svc.id));
 
+  const demoFromAddress = verifiedOnChain && demoKeypair
+    ? demoKeypair.publicKey()
+    : agent.stellarAddress;
+
   steps.push({
     step: "payment_confirmed",
     status: "success",
-    message: `MPP payment of ${amountUsdc} USDC split and confirmed on Stellar Testnet`,
+    message: verifiedOnChain
+      ? `Real MPP payment of ${amountUsdc} USDC confirmed on Stellar Testnet — verified on-chain`
+      : `MPP payment of ${amountUsdc} USDC split and confirmed on Stellar Testnet (simulated)`,
     data: {
       txHash,
       totalUsdc: amountUsdc,
       serviceAmount,
       protocolFee: feeAmount,
-      fromAddress: agent.stellarAddress,
+      fromAddress: demoFromAddress,
       toAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS,
       network: "testnet",
-      verifiedOnChain: false,
+      verifiedOnChain,
       ...(sessionId != null ? { sessionId: String(sessionId) } : { sessionId: null }),
       paymentId: String(payment!.id),
       stellarExplorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
@@ -300,8 +339,9 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     ratingId: String(rating!.id),
     sessionId: String(sessionId),
     txHash,
-    stellarExplorerUrl,
-    summary: `Agent "${agent.name}" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid ${amountUsdc} USDC on Stellar Testnet (tx: ${txHash.slice(0, 16)}...), received service output, and earned ${stars}/5 stars, updating its reputation score to ${Math.round(newScore * 100) * 100 / 10000}.`,
+    verified: verifiedOnChain,
+    stellarExplorerUrl: verifiedOnChain ? stellarExplorerUrl : null,
+    summary: `Agent "${agent.name}" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid ${amountUsdc} USDC on Stellar Testnet${verifiedOnChain ? "" : " (simulated)"} (tx: ${txHash.slice(0, 16)}...), received service output, and earned ${stars}/5 stars, updating its reputation score to ${Math.round(newScore * 100) * 100 / 10000}.`,
   });
 });
 
