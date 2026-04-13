@@ -10,7 +10,7 @@ services:
       BASE_PATH=/ pnpm --filter @workspace/trust-fabric run build &&
       pnpm --filter @workspace/api-server run build
     startCommand: pnpm --filter @workspace/api-server run start
-    healthCheckPath: /
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
