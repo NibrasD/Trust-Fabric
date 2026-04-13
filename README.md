@@ -159,7 +159,7 @@ contracts/
 
 | Contract | Address | Purpose |
 |---|---|---|
-| `reputation` | `[CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA](https://stellar.expert/explorer/testnet/contract/CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA).` | Agent & service reputation scoring |
+| `reputation` | `https://stellar.expert/explorer/testnet/contract/CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA` | Agent & service reputation scoring |
 | `registry` | `https://stellar.expert/explorer/testnet/contract/CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6` | Service provider directory |
 | `session-policy` | `https://stellar.expert/explorer/testnet/contract/CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7` | Budget caps + endpoint whitelists |
 
@@ -407,9 +407,6 @@ curl -X POST http://localhost:8080/api/services/market/data \
 
 ---
 
-## Deploy to Render
-
-The project ships with a `render.yaml` Blueprint for one-click deployment as a single Web Service (API + frontend bundled together).
 
 ### Steps
 
@@ -449,24 +446,6 @@ Render builds and starts the service automatically. The API serves the React das
 ```
 https://stellar-agent-trust-fabric.onrender.com/       → Dashboard (React)
 https://stellar-agent-trust-fabric.onrender.com/api/   → REST API
-```
-
-### Build Process (what Render runs)
-
-```bash
-# 1. Install all workspace dependencies
-pnpm install --frozen-lockfile
-
-# 2. Build React frontend → artifacts/trust-fabric/dist/public/
-# (shared libs have no separate build step — bundled directly by Vite/esbuild)
-BASE_PATH=/ pnpm --filter @workspace/trust-fabric run build
-
-# 3. Bundle API server → artifacts/api-server/dist/
-# (also bundles lib/db, lib/api-zod, lib/api-client-react via esbuild)
-pnpm --filter @workspace/api-server run build
-
-# 4. Start (API also serves frontend static files in NODE_ENV=production)
-pnpm --filter @workspace/api-server run start
 ```
 
 ---
