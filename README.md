@@ -159,9 +159,9 @@ contracts/
 
 | Contract | Address | Purpose |
 |---|---|---|
-| `reputation` | `CAXV62II...` | Agent & service reputation scoring |
-| `registry` | `CDG7G7MB...` | Service provider directory |
-| `session-policy` | `CAKSBWFS...` | Budget caps + endpoint whitelists |
+| `reputation` | `[CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA](https://stellar.expert/explorer/testnet/contract/CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA).` | Agent & service reputation scoring |
+| `registry` | `https://stellar.expert/explorer/testnet/contract/CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6` | Service provider directory |
+| `session-policy` | `https://stellar.expert/explorer/testnet/contract/CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7` | Budget caps + endpoint whitelists |
 
 ---
 
