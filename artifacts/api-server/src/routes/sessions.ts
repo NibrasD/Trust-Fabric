@@ -31,6 +31,11 @@ function formatSessionRow(s: typeof sessionsTable.$inferSelect, agentName: strin
   };
 }
 
+async function formatSession(s: typeof sessionsTable.$inferSelect) {
+  const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, s.agentId));
+  return formatSessionRow(s, agent?.name ?? "Unknown");
+}
+
 function expireOldSessionsAsync() {
   db.update(sessionsTable)
     .set({ status: "expired" })
@@ -106,7 +111,7 @@ router.post("/sessions", async (req, res): Promise<void> => {
 });
 
 router.get("/sessions/:sessionId", async (req, res): Promise<void> => {
-  await expireOldSessions();
+  expireOldSessionsAsync();
   const params = GetSessionParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "bad_request", message: params.error.message });

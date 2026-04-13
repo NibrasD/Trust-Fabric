@@ -1,0 +1,84 @@
+Demo Lab
+Simulate an autonomous agent purchasing an API service via x402.
+
+Simulation Parameters
+Select an agent and a service. The agent will hit a 402 Payment Required, create a session, pay, and execute.
+Agent (Buyer)
+Sentinel Bot (5.14)
+
+Service (Seller)
+Market Data Feed ($0.05)
+
+Payload
+Stellar is an open-source, decentralized protocol for digital currency to fiat money low-cost transfers which allows cross-border transactions between any pair of currencies. The Stellar protocol is supported by a non-profit organization, the Stellar Development Foundation.
+Run Agent
+Execution Log
+Live output of the agent's decision making process.
+SERVICE DISCOVERY
+Agent "Sentinel Bot" discovered service "Market Data Feed" in the registry
+
+{
+  "agentAddress": "GAUFDDTXBUK3SGKGZQVAXPJDAF3FTUAN325DEKIEUXEGFBMGMWQI5O75",
+  "serviceEndpoint": "/api/services/market/data",
+  "priceUsdc": 0.05,
+  "serviceReputation": 80
+}
+SESSION CHECK
+Scoped session authorized — max spend 0.050000 USDC, endpoint /api/services/market/data whitelisted
+
+{
+  "maxSpendUsdc": 0.05,
+  "allowedEndpoints": [
+    "/api/services/market/data"
+  ],
+  "timeoutSeconds": 3600
+}
+X402 REQUEST
+Agent sent HTTP request to /api/services/market/data — received 402 Payment Required
+
+{
+  "httpStatus": 402,
+  "x402Version": 1,
+  "requiredAmount": "0.050000 USDC",
+  "network": "stellar-testnet",
+  "payTo": "GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB",
+  "asset": "USDC:GAIMP3OBUBK6Y72YGV3ZQJKRVQE5KH3VAIOG5QG2AB3VJCPQPBC4F3QP",
+  "mppEnabled": true,
+  "protocolFeeAddress": "GAIMP3OBUBK6Y72YGV3ZQJKRVQE5KH3VAIOG5QG2AB3VJCPQPBC4F3QP",
+  "protocolFeeFraction": 0.1
+}
+PAYMENT CONFIRMED
+MPP payment of 0.05 USDC split and confirmed on Stellar Testnet
+
+{
+  "txHash": "313737363038353033323333371ab93d38fdff18",
+  "totalUsdc": 0.05,
+  "serviceAmount": "0.0450000",
+  "protocolFee": "0.0050000",
+  "fromAddress": "GAUFDDTXBUK3SGKGZQVAXPJDAF3FTUAN325DEKIEUXEGFBMGMWQI5O75",
+  "toAddress": "GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB",
+  "network": "testnet",
+  "verifiedOnChain": false,
+  "stellarExplorerUrl": "https://stellar.expert/explorer/testnet/tx/313737363038353033323333371ab93d38fdff18"
+}
+SERVICE EXECUTED
+Service returned response — access granted after payment verification
+
+{
+  "summary": "Stellar is an open-source, decentralized protocol for digital currency to fiat money low-cost transfers which allows cross-border transactions between any pair of currencies.  The Stellar protocol is supported by a non-profit organization, the Stellar Development Foundation.",
+  "wordCount": 36,
+  "httpStatus": 200
+}
+REPUTATION UPDATED
+Agent rated 5/5 stars — on-chain reputation updated by +0.24 points
+
+{
+  "stars": 5,
+  "reputationDelta": 0.24,
+  "previousScore": 5.14,
+  "newScore": 5.38
+}
+Result Summary
+Agent "Sentinel Bot" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid 0.05 USDC on Stellar Testnet (tx: 3137373630383530...), received service output, and earned 5/5 stars, updating its reputation score to 5.38.
+
+313737363038...fdff18

@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, agentsTable, servicesTable, paymentsTable, ratingsTable } from "@workspace/db";
+import { eq, and, gt } from "drizzle-orm";
+import { db, agentsTable, servicesTable, paymentsTable, ratingsTable, sessionsTable } from "@workspace/db";
 import { RunDemoAgentBody } from "@workspace/api-zod";
 import {
   buildX402Challenge,
   PROTOCOL_FEE_ADDRESS,
   PROTOCOL_FEE_FRACTION,
 } from "../lib/stellarPayments.js";
+import { randomBytes } from "crypto";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,9 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     return;
   }
 
+  const amountUsdc = Number(svc.priceUsdc);
+
+  // ── Step 1: Service Discovery ─────────────────────────────────────────────
   steps.push({
     step: "service_discovery",
     status: "success",
@@ -39,25 +43,95 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     data: {
       agentAddress: agent.stellarAddress,
       serviceEndpoint: svc.endpoint,
-      priceUsdc: Number(svc.priceUsdc),
+      priceUsdc: amountUsdc,
       serviceReputation: Number(svc.reputationScore),
     },
   });
 
-  steps.push({
-    step: "session_check",
-    status: "success",
-    message: `Scoped session authorized — max spend ${svc.priceUsdc} USDC, endpoint ${svc.endpoint} whitelisted`,
-    data: {
-      maxSpendUsdc: Number(svc.priceUsdc),
-      allowedEndpoints: [svc.endpoint],
-      timeoutSeconds: 3600,
-    },
-  });
+  // ── Step 2: Session Check / Create ────────────────────────────────────────
+  // Look for an existing active session scoped to this endpoint
+  const now = new Date();
+  const [existingSession] = await db
+    .select()
+    .from(sessionsTable)
+    .where(
+      and(
+        eq(sessionsTable.agentId, agent.id),
+        eq(sessionsTable.status, "active"),
+        gt(sessionsTable.expiresAt, now)
+      )
+    )
+    .limit(1);
 
+  let sessionId: number;
+  let sessionToken: string;
+  let sessionWasNew = false;
+
+  const sessionEndpoints: string[] = existingSession?.allowedEndpoints ?? [];
+  const endpointAllowed =
+    sessionEndpoints.length === 0 || sessionEndpoints.includes(svc.endpoint);
+  const withinBudget = existingSession
+    ? Number(existingSession.spentUsdc) + amountUsdc <= Number(existingSession.maxSpendUsdc)
+    : true;
+
+  if (existingSession && endpointAllowed && withinBudget) {
+    // Re-use the existing session
+    sessionId = existingSession.id;
+    sessionToken = existingSession.sessionToken;
+    steps.push({
+      step: "session_check",
+      status: "success",
+      message: `Active session found — endpoint ${svc.endpoint} whitelisted, ${(Number(existingSession.maxSpendUsdc) - Number(existingSession.spentUsdc)).toFixed(4)} USDC remaining`,
+      data: {
+        sessionId: String(sessionId),
+        sessionToken: sessionToken.slice(0, 20) + "...",
+        maxSpendUsdc: Number(existingSession.maxSpendUsdc),
+        spentUsdc: Number(existingSession.spentUsdc),
+        allowedEndpoints: sessionEndpoints,
+        expiresAt: existingSession.expiresAt.toISOString(),
+      },
+    });
+  } else {
+    // Create a new scoped session for this demo run (expires in 1 hour)
+    sessionToken = "stf_demo_" + randomBytes(16).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    const maxSpend = amountUsdc * 20; // allow up to 20 calls
+
+    const [newSession] = await db
+      .insert(sessionsTable)
+      .values({
+        agentId: agent.id,
+        sessionToken,
+        maxSpendUsdc: String(maxSpend),
+        spentUsdc: "0",
+        allowedEndpoints: [svc.endpoint],
+        expiresAt,
+        status: "active",
+      })
+      .returning();
+
+    sessionId = newSession!.id;
+    sessionWasNew = true;
+
+    steps.push({
+      step: "session_check",
+      status: "success",
+      message: `New scoped session created — max spend ${maxSpend.toFixed(4)} USDC, endpoint ${svc.endpoint} whitelisted`,
+      data: {
+        sessionId: String(sessionId),
+        sessionToken: sessionToken.slice(0, 24) + "...",
+        maxSpendUsdc: maxSpend,
+        allowedEndpoints: [svc.endpoint],
+        expiresAt: expiresAt.toISOString(),
+        isNew: true,
+      },
+    });
+  }
+
+  // ── Step 3: x402 Request ──────────────────────────────────────────────────
   const x402Challenge = buildX402Challenge({
     serviceAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS,
-    amountUsdc: Number(svc.priceUsdc),
+    amountUsdc,
     resource: svc.endpoint,
     description: `${svc.name} — ${svc.priceUsdc} USDC per request`,
   });
@@ -79,11 +153,8 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     },
   });
 
-  // In demo mode, we simulate the Stellar transaction with a realistic hash.
-  // In production, the agent would sign and submit a real MPP transaction.
-  const amountUsdc = Number(svc.priceUsdc);
+  // ── Step 4: Payment ───────────────────────────────────────────────────────
   const txHash = `${Buffer.from(Date.now().toString()).toString("hex").slice(0, 32)}${Math.random().toString(16).slice(2, 34)}`;
-
   const serviceAmount = (amountUsdc * (1 - PROTOCOL_FEE_FRACTION)).toFixed(7);
   const feeAmount = (amountUsdc * PROTOCOL_FEE_FRACTION).toFixed(7);
 
@@ -92,6 +163,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     .values({
       agentId: Number(agentId),
       serviceId: Number(serviceId),
+      sessionId,
       amountUsdc: String(amountUsdc),
       txHash,
       fromAddress: agent.stellarAddress,
@@ -100,6 +172,14 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     })
     .returning();
 
+  // Update session spentUsdc
+  const prevSpent = existingSession && !sessionWasNew ? Number(existingSession.spentUsdc) : 0;
+  await db
+    .update(sessionsTable)
+    .set({ spentUsdc: String(prevSpent + amountUsdc) })
+    .where(eq(sessionsTable.id, sessionId));
+
+  // Update agent totals
   await db
     .update(agentsTable)
     .set({
@@ -108,6 +188,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     })
     .where(eq(agentsTable.id, agent.id));
 
+  // Update service call count
   await db
     .update(servicesTable)
     .set({ totalCalls: svc.totalCalls + 1 })
@@ -126,10 +207,13 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       toAddress: svc.ownerAddress ?? PROTOCOL_FEE_ADDRESS,
       network: "testnet",
       verifiedOnChain: false,
+      sessionId: String(sessionId),
+      paymentId: String(payment!.id),
       stellarExplorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
     },
   });
 
+  // ── Step 5: Service Execution ─────────────────────────────────────────────
   const text = textToSummarize ?? "The Stellar network is a decentralized blockchain that enables fast, low-cost financial transactions and smart contracts through Soroban.";
   const words = text.trim().split(/\s+/);
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 5);
@@ -149,6 +233,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     },
   });
 
+  // ── Step 6: Reputation Update ─────────────────────────────────────────────
   const stars = Math.random() > 0.2 ? 4 + Math.floor(Math.random() * 2) : 3;
   const delta = Math.round(Math.log1p(amountUsdc) * (stars - 3) * 2.5 * 100) / 100;
 
@@ -164,8 +249,8 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     })
     .returning();
 
-  const updatedAgent = await db.select().from(agentsTable).where(eq(agentsTable.id, Number(agentId)));
-  const agentCurrentScore = Number(updatedAgent[0]?.reputationScore ?? agent.reputationScore);
+  const [updatedAgent] = await db.select().from(agentsTable).where(eq(agentsTable.id, Number(agentId)));
+  const agentCurrentScore = Number(updatedAgent?.reputationScore ?? agent.reputationScore);
   const newScore = Math.max(0, Math.min(100, agentCurrentScore + delta));
 
   const allRatings = await db.select().from(ratingsTable).where(eq(ratingsTable.agentId, Number(agentId)));
@@ -196,8 +281,9 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     finalReputationScore: Math.round(newScore * 100) / 100,
     paymentId: String(payment!.id),
     ratingId: String(rating!.id),
+    sessionId: String(sessionId),
     txHash,
-    summary: `Agent "${agent.name}" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid ${amountUsdc} USDC on Stellar Testnet (tx: ${txHash.slice(0, 16)}...), received service output, and earned ${stars}/5 stars, updating its reputation score to ${Math.round(newScore * 100) / 100}.`,
+    summary: `Agent "${agent.name}" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid ${amountUsdc} USDC on Stellar Testnet (tx: ${txHash.slice(0, 16)}...), received service output, and earned ${stars}/5 stars, updating its reputation score to ${Math.round(newScore * 100) * 100 / 10000}.`,
   });
 });
 
