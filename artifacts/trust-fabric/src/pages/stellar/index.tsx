@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Zap,
@@ -20,6 +21,7 @@ import {
   Shield,
   Split,
   Network,
+  ListChecks,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -95,6 +97,12 @@ export default function StellarLab() {
     queryKey: ["stellar-network"],
     queryFn: () => apiGet("/stellar/network"),
     refetchInterval: 30000,
+  });
+
+  // Services list for the service picker
+  const { data: servicesData } = useQuery({
+    queryKey: ["services-list"],
+    queryFn: () => apiGet("/services"),
   });
 
   // x402 challenge from the actual service (returns 402, which we display)
@@ -453,6 +461,45 @@ export default function StellarLab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Quick-fill from registered service */}
+          {(servicesData as any)?.services?.length > 0 && (
+            <div className="space-y-2 pb-2 border-b border-border">
+              <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ListChecks className="h-3.5 w-3.5" />
+                Quick Fill from Registered Service
+              </Label>
+              <Select
+                onValueChange={(val) => {
+                  const svc = (servicesData as any).services.find((s: any) => s.id === val);
+                  if (!svc) return;
+                  const payTo = (x402Spec as any)?.accepts?.[0]?.payTo ?? "";
+                  setBuildForm(f => ({
+                    ...f,
+                    toAddress: payTo,
+                    amountUsdc: String(svc.priceUsdc),
+                    memo: `stf-${svc.id}`.slice(0, 28),
+                  }));
+                }}
+              >
+                <SelectTrigger className="text-xs">
+                  <SelectValue placeholder="Select a service to auto-fill address & amount" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(servicesData as any).services.map((svc: any) => (
+                    <SelectItem key={svc.id} value={svc.id}>
+                      <span className="font-medium">{svc.name}</span>
+                      <span className="ml-2 text-muted-foreground font-mono">{svc.priceUsdc} USDC</span>
+                      <span className="ml-2 text-xs text-muted-foreground/60">[{svc.category}]</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                Fills the service payment address from the live x402 challenge and the price from the registry.
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>From (Secret Key)</Label>
@@ -467,14 +514,24 @@ export default function StellarLab() {
             <div className="space-y-2">
               <Label>To (Service Address)</Label>
               <Input
-                placeholder="G... (service provider address)"
+                placeholder="G... (service provider Stellar address)"
                 value={buildForm.toAddress}
                 onChange={(e) => setBuildForm(f => ({ ...f, toAddress: e.target.value }))}
                 className="font-mono text-xs"
               />
+              {buildForm.toAddress && (
+                <a
+                  href={`https://stellar.expert/explorer/testnet/account/${buildForm.toAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                >
+                  View on Stellar Expert <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Amount (XLM)</Label>
+              <Label>Amount (USDC)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -511,15 +568,15 @@ export default function StellarLab() {
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="bg-muted rounded p-2 col-span-1">
                   <span className="text-muted-foreground">Total</span>
-                  <p className="font-mono font-bold">{buildResult.amountUsdc} XLM</p>
+                  <p className="font-mono font-bold">{buildResult.amountUsdc} USDC</p>
                 </div>
                 <div className="bg-green-900/20 border border-green-800/30 rounded p-2">
                   <span className="text-muted-foreground">Service (90%)</span>
-                  <p className="font-mono font-bold text-green-400">{buildResult.mppSplit.serviceAmount} XLM</p>
+                  <p className="font-mono font-bold text-green-400">{buildResult.mppSplit.serviceAmount} USDC</p>
                 </div>
                 <div className="bg-blue-900/20 border border-blue-800/30 rounded p-2">
                   <span className="text-muted-foreground">Protocol (10%)</span>
-                  <p className="font-mono font-bold text-blue-400">{buildResult.mppSplit.protocolFee} XLM</p>
+                  <p className="font-mono font-bold text-blue-400">{buildResult.mppSplit.protocolFee} USDC</p>
                 </div>
               </div>
               <div className="space-y-1">
