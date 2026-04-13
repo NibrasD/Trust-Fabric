@@ -61,8 +61,16 @@ export default function StellarLab() {
   const [balanceAddress, setBalanceAddress] = useState("");
   const [balanceResult, setBalanceResult] = useState<null | { xlm: string; usdc: string }>(null);
 
-  // State for payment build
-  const [buildForm, setBuildForm] = useState({ fromSecretKey: "", toAddress: "", amountUsdc: "0.10", memo: "" });
+  // State for payment build — pre-fill from URL query params (pay links)
+  const [buildForm, setBuildForm] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      fromSecretKey: "",
+      toAddress: params.get("payTo") ?? "",
+      amountUsdc: params.get("amount") ?? "0.10",
+      memo: params.get("memo") ?? "",
+    };
+  });
   const [buildResult, setBuildResult] = useState<null | {
     xdr: string;
     fromAddress: string;
