@@ -1,0 +1,44 @@
+{"level":30,"time":1776091821678,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":93,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+Menu
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://stellar-agent-trust-fabric.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+{"level":30,"time":1776091822543,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":94,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+{"level":30,"time":1776091823998,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":4,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+{"level":30,"time":1776091827558,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":95,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":19,"msg":"request completed"}
+{"level":30,"time":1776091828993,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":5,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091832546,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":96,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091833994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":6,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091837539,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":97,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091838994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":7,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091842540,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":98,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091843994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":8,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091847539,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":99,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091848126,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":9,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091848994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":10,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091852541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":100,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091853994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":11,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091857570,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":101,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":14,"msg":"request completed"}
+{"level":30,"time":1776091858994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":12,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091862539,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":102,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091863994,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":13,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091867539,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":103,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091868407,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":14,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091868516,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":15,"method":"GET","url":"/assets/index-DM-YKQFU.css"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091868519,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":16,"method":"GET","url":"/assets/index-C_IZqJ63.js"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+{"level":30,"time":1776091868951,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":17,"method":"GET","url":"/api/healthz"},"res":{"statusCode":304},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091868993,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":20,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091869023,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":22,"method":"GET","url":"/api/stellar/soroban"},"res":{"statusCode":304},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091872542,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":104,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091873992,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":23,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":0,"msg":"request completed"}
+{"level":30,"time":1776091874712,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":24,"method":"GET","url":"/assets/index-DM-YKQFU.css"},"res":{"statusCode":304},"responseTime":0,"msg":"request completed"}
+{"level":30,"time":1776091877541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":105,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776091878125,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":25,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091878993,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":26,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+/opt/render/project/src/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Command failed with signal "SIGTERM"
+{"level":30,"time":1776091883993,"pid":85,"hostname":"srv-d7ef8o77f7vs73ehj6eg-f9d9fdd45-n5tf2","req":{"id":27,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
