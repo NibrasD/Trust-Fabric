@@ -8,21 +8,23 @@
  *
  * 2. On subsequent request (with X-PAYMENT header containing tx hash):
  *    → Verifies the Stellar transaction via Horizon API.
- *    → If valid, records the payment and allows the request through.
- *    → If invalid, returns 402 again.
+ *    → Checks active Session policy for this agent (if one exists):
+ *        - Endpoint must be in allowedEndpoints
+ *        - spentUsdc must not exceed maxSpendUsdc
+ *    → If valid, allows the request through.
+ *    → If invalid, returns 402 / 403 as appropriate.
  *
  * The X-PAYMENT header format:
  *   X-PAYMENT: <stellar_tx_hash>
- *   (In production, this would be a signed payment payload per x402 spec)
  */
 
 import type { Request, Response, NextFunction } from "express";
+import { eq, and, gt } from "drizzle-orm";
 import {
   verifyPayment,
   buildX402Challenge,
-  PROTOCOL_FEE_ADDRESS,
 } from "./stellarPayments.js";
-import { logger } from "./logger.js";
+import { db, agentsTable, sessionsTable } from "@workspace/db";
 
 export interface X402MiddlewareOptions {
   /** Address that receives the payment */
@@ -35,10 +37,6 @@ export interface X402MiddlewareOptions {
   verifyOnChain?: boolean;
 }
 
-/**
- * Extract X-PAYMENT header from request.
- * The header should contain the Stellar transaction hash (64-char hex).
- */
 function extractPaymentHeader(req: Request): string | null {
   const header = req.headers["x-payment"] ?? req.headers["X-PAYMENT"];
   if (!header || typeof header !== "string") return null;
@@ -48,14 +46,73 @@ function extractPaymentHeader(req: Request): string | null {
 }
 
 /**
- * Create the x402 middleware for a specific resource.
+ * Check if a session policy allows this request.
+ * Returns { allowed: true, sessionId } or { allowed: false, error, reason }.
  *
- * Usage:
- *   router.post("/paid/summarize",
- *     x402Middleware({ payToAddress: "G...", amountUsdc: 0.10, description: "AI Summarizer" }),
- *     handler
- *   );
+ * If no session exists for this agent, the request is allowed (payment alone is sufficient).
+ * If a session exists, it must permit the endpoint and have remaining spend capacity.
  */
+async function enforceSessionPolicy(
+  fromAddress: string,
+  endpoint: string,
+  amountUsdc: number
+): Promise<{ allowed: true; sessionId?: number } | { allowed: false; error: string; reason: string }> {
+  // Skip enforcement for dev_mode
+  if (fromAddress === "dev_mode") return { allowed: true };
+
+  // Look up agent by Stellar address
+  const [agent] = await db
+    .select()
+    .from(agentsTable)
+    .where(eq(agentsTable.stellarAddress, fromAddress));
+
+  if (!agent) return { allowed: true }; // Unknown agent — payment alone is sufficient
+
+  // Find an active, non-expired session for this agent
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(
+      and(
+        eq(sessionsTable.agentId, agent.id),
+        eq(sessionsTable.status, "active"),
+        gt(sessionsTable.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+
+  if (!session) return { allowed: true }; // No active session — open access via payment
+
+  // Session exists — enforce endpoint policy
+  const allowedEndpoints: string[] = session.allowedEndpoints ?? [];
+  if (allowedEndpoints.length > 0 && !allowedEndpoints.includes(endpoint)) {
+    return {
+      allowed: false,
+      error: "session_endpoint_denied",
+      reason: `Endpoint ${endpoint} is not in the allowed list for session ${session.sessionToken}. Allowed: ${allowedEndpoints.join(", ")}`,
+    };
+  }
+
+  // Enforce spending limit
+  const spent = Number(session.spentUsdc ?? 0);
+  const maxSpend = Number(session.maxSpendUsdc ?? 0);
+  if (maxSpend > 0 && spent + amountUsdc > maxSpend) {
+    return {
+      allowed: false,
+      error: "session_spend_limit_exceeded",
+      reason: `Session spending limit reached: ${spent.toFixed(4)} / ${maxSpend.toFixed(4)} USDC. Create a new session to continue.`,
+    };
+  }
+
+  // All checks passed — increment spentUsdc
+  await db
+    .update(sessionsTable)
+    .set({ spentUsdc: String(spent + amountUsdc) })
+    .where(eq(sessionsTable.id, session.id));
+
+  return { allowed: true, sessionId: session.id };
+}
+
 export function x402Middleware(opts: X402MiddlewareOptions) {
   const {
     payToAddress,
@@ -80,19 +137,20 @@ export function x402Middleware(opts: X402MiddlewareOptions) {
       return;
     }
 
-    // Payment header present — verify the transaction
     const txHash = paymentHeader.toUpperCase().replace(/^0x/, "");
+    let fromAddress = "dev_mode";
+    let paymentAmount = String(amountUsdc);
+    let verifiedOnChain = false;
 
     if (verifyOnChain) {
       const verification = await verifyPayment({
         txHash,
         expectedPayTo: payToAddress,
         expectedMinAmountUsdc: amountUsdc,
-        maxAgeSeconds: 600, // 10 minutes
+        maxAgeSeconds: 600,
       });
 
       if (!verification.valid) {
-        req.log.warn({ txHash, error: verification.error }, "x402 payment verification failed");
         res.status(402).json({
           error: "Payment verification failed",
           reason: verification.error,
@@ -107,42 +165,46 @@ export function x402Middleware(opts: X402MiddlewareOptions) {
         return;
       }
 
-      req.log.info(
-        { txHash, from: verification.fromAddress, amount: verification.amount },
-        "x402 payment verified on Stellar Testnet"
-      );
-
-      // Attach verified payment info to request for handlers to use
-      (req as X402Request).x402Payment = {
-        txHash,
-        fromAddress: verification.fromAddress!,
-        amount: verification.amount!,
-        verified: true,
-        verifiedOnChain: true,
-      };
-    } else {
-      // Development mode: accept the tx hash as-is, don't verify on Horizon
-      req.log.info({ txHash }, "x402 payment accepted (dev mode - no on-chain verification)");
-      (req as X402Request).x402Payment = {
-        txHash,
-        fromAddress: "dev_mode",
-        amount: String(amountUsdc),
-        verified: true,
-        verifiedOnChain: false,
-      };
+      fromAddress = verification.fromAddress!;
+      paymentAmount = verification.amount!;
+      verifiedOnChain = true;
     }
+
+    // Derive the canonical endpoint path (strip query string)
+    const endpoint = req.originalUrl.split("?")[0]!;
+
+    // Enforce session policy (if an active session exists for this agent)
+    const sessionCheck = await enforceSessionPolicy(fromAddress, endpoint, amountUsdc);
+
+    if (!sessionCheck.allowed) {
+      res.status(403).json({
+        error: sessionCheck.error,
+        reason: sessionCheck.reason,
+        x402Version: 1,
+      });
+      return;
+    }
+
+    (req as X402Request).x402Payment = {
+      txHash,
+      fromAddress,
+      amount: paymentAmount,
+      verified: true,
+      verifiedOnChain,
+      sessionId: sessionCheck.allowed && "sessionId" in sessionCheck ? sessionCheck.sessionId : undefined,
+    };
 
     next();
   };
 }
 
-// Extend Express Request type with payment info
 export interface X402Payment {
   txHash: string;
   fromAddress: string;
   amount: string;
   verified: boolean;
   verifiedOnChain: boolean;
+  sessionId?: number;
 }
 
 export interface X402Request extends Request {
