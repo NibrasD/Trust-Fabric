@@ -239,9 +239,21 @@ export default function DemoLab() {
                       <Star className="h-4 w-4 text-primary" /> Result Summary
                     </h4>
                     <p>{demoResult.summary}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Badge variant="outline" className="font-mono">{demoResult.txHash ? truncateHash(demoResult.txHash) : 'No Tx'}</Badge>
-                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      {demoResult.stellarExplorerUrl ? (
+                        <a
+                          href={demoResult.stellarExplorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-xs border border-border rounded px-2 py-0.5 text-primary hover:bg-primary/10 transition-colors"
+                          title={demoResult.txHash}
+                        >
+                          {truncateHash(demoResult.txHash)}
+                          <ArrowRight className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <Badge variant="outline" className="font-mono">{demoResult.txHash ? truncateHash(demoResult.txHash) : 'No Tx'}</Badge>
+                      )}
                       <Badge className="bg-primary text-primary-foreground">Reputation: {demoResult.finalReputationScore}</Badge>
                     </div>
                   </div>

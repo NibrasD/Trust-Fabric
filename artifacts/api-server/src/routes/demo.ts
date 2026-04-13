@@ -289,6 +289,8 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     },
   });
 
+  const stellarExplorerUrl = `https://stellar.expert/explorer/testnet/tx/${txHash}`;
+
   res.json({
     steps,
     finalReputationScore: Math.round(newScore * 100) / 100,
@@ -296,6 +298,7 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     ratingId: String(rating!.id),
     sessionId: String(sessionId),
     txHash,
+    stellarExplorerUrl,
     summary: `Agent "${agent.name}" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid ${amountUsdc} USDC on Stellar Testnet (tx: ${txHash.slice(0, 16)}...), received service output, and earned ${stars}/5 stars, updating its reputation score to ${Math.round(newScore * 100) * 100 / 10000}.`,
   });
 });
