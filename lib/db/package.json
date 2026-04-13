@@ -8,13 +8,15 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+    "push": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push --config ./drizzle.config.ts",
+    "push-force": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push --force --config ./drizzle.config.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
     "drizzle-orm": "catalog:",
     "drizzle-zod": "^0.8.3",
     "pg": "^8.20.0",
+    "postgres": "^3.4.9",
     "zod": "catalog:"
   },
   "devDependencies": {

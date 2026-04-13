@@ -126,9 +126,21 @@ Key relationships:
 - `GET /api/mcp` — MCP server info (name, version, 10 tools)
 - `POST /api/mcp` — JSON-RPC 2.0 MCP endpoint (10 tools, auto-pay via Authorization: Bearer <stellar_secret>)
 
+## Database
+
+The app uses **Supabase** (not Replit's built-in PostgreSQL) as its database.
+
+- Project: `bodmjihhibzzokuvemsf.supabase.co` (EU West 1 region)
+- Connection: Session pooler at `aws-0-eu-west-1.pooler.supabase.com:5432`
+- The `lib/db/src/index.ts` prefers `SUPABASE_DATABASE_URL` over `DATABASE_URL`
+- The `sslmode=require` is stripped from the URL and `ssl: { rejectUnauthorized: false }` is passed as an object to avoid self-signed cert errors with pg@8
+- Drizzle push: `pnpm --filter @workspace/db run push` (sets `NODE_TLS_REJECT_UNAUTHORIZED=0` for push only)
+
 ## Environment Variables
 
-- `DATABASE_URL` — PostgreSQL connection string
+- `SUPABASE_DATABASE_URL` — Supabase session pooler connection string (preferred, set as shared env var)
+- `DATABASE_URL` — Replit-managed PostgreSQL (fallback, not used when SUPABASE_DATABASE_URL is set)
+- `SUPABASE_DB_PASSWORD` — Supabase database password (Replit secret)
 - `SESSION_SECRET` — Cookie signing secret
 - `PORT` — Server port (auto-assigned by Replit)
 - `USDC_ISSUER` — USDC asset issuer (`GBB6YO4V5K37CXZV4N3ZG4X7NQBCOSSFFQ566CAWSXGMCDIG63GH7UCZ`) — **set and active**
