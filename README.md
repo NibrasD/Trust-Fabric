@@ -200,6 +200,7 @@ Three contracts deployed on Stellar Testnet enforce the on-chain trust layer. Th
 
 | Contract | Contract ID | Purpose |
 |---|---|---|
+<<<<<<< HEAD
 | **Reputation** | `CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6` | Agent and service reputation scoring |
 | **Registry** | `CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA` | Service provider on-chain directory |
 | **Session Policy** | `CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7` | Budget caps, spend authorization, revocation |
@@ -237,6 +238,11 @@ l."2" = del_contract_data(key, storage_type)         → Delete
 ```
 
 All contract writes require the `ADMIN_SECRET` key to sign transactions. External callers cannot write to the contracts without this key.
+=======
+| `reputation` | `https://stellar.expert/explorer/testnet/contract/CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA` | Agent & service reputation scoring |
+| `registry` | `https://stellar.expert/explorer/testnet/contract/CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6` | Service provider directory |
+| `session-policy` | `https://stellar.expert/explorer/testnet/contract/CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7` | Budget caps + endpoint whitelists |
+>>>>>>> 88c5c47bb9bea46afcd685e5b29126b8c199082c
 
 ---
 
@@ -517,6 +523,7 @@ curl http://localhost:8080/api/services/paid/summarize
 
 ---
 
+<<<<<<< HEAD
 ## Future Vision
 
 - **On-chain payment routing**: Soroban contract directly calls USDC SAC (Stellar Asset Contract) to enforce payment atomically with session authorization in a single contract invocation
@@ -524,6 +531,48 @@ curl http://localhost:8080/api/services/paid/summarize
 - **Privacy-preserving reputation**: Zero-knowledge proofs to prove reputation thresholds without revealing exact scores
 - **Agent-to-agent micropayments**: Agents paying other agents for sub-tasks (recursive x402)
 - **Mainnet deployment**: Production-ready with audited contracts and real USDC settlement
+=======
+
+### Steps
+
+**1. Push to GitHub**
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/<you>/stellar-agent-trust-fabric.git
+git push -u origin main
+```
+
+**2. Create Render service**
+
+- Go to [render.com](https://render.com) → **New** → **Blueprint**
+- Connect your GitHub repo
+- Render reads `render.yaml` automatically and configures the service
+
+**3. Set secret environment variables**
+
+In the Render dashboard → your service → **Environment**, add:
+
+| Variable | Value |
+|---|---|
+| `SUPABASE_DATABASE_URL` | Your Supabase connection string |
+| `DEMO_AGENT_SECRET` | Stellar secret key of the demo wallet |
+| `STELLAR_FAUCET_SECRET` | Stellar secret key of the USDC faucet |
+| `SOROBAN_ADMIN_SECRET` | Admin keypair for Soroban |
+
+All other variables (contract IDs, addresses, `STELLAR_VERIFY_ONCHAIN`) are pre-configured in `render.yaml`.
+
+**4. Deploy**
+
+Render builds and starts the service automatically. The API serves the React dashboard as static files — no separate frontend deployment needed.
+
+```
+https://stellar-agent-trust-fabric.onrender.com/       → Dashboard (React)
+https://stellar-agent-trust-fabric.onrender.com/api/   → REST API
+```
+
 
 ---
 
