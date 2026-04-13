@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { randomBytes } from "crypto";
 import { Keypair } from "@stellar/stellar-sdk";
+import { logger } from "../lib/logger.js";
 import { eq, and, gt } from "drizzle-orm";
 import { db, agentsTable, servicesTable, paymentsTable, ratingsTable, sessionsTable } from "@workspace/db";
 import { RunDemoAgentBody } from "@workspace/api-zod";
@@ -194,14 +195,20 @@ router.post("/demo/run", async (req, res): Promise<void> => {
       txHash = result.hash;
       verifiedOnChain = true;
     } catch (payErr: any) {
-      // Fallback to simulated if real payment fails (e.g. insufficient balance)
+      // Fallback to simulated if real payment fails — log the real reason
+      const errDetail = payErr?.response
+        ? await payErr.response.json().catch(() => ({ raw: payErr.message }))
+        : { raw: payErr?.message ?? String(payErr) };
+      logger.error({ err: errDetail }, "Demo real payment failed — falling back to simulated");
       txHash = randomBytes(32).toString("hex");
       verifiedOnChain = false;
+      (steps as any).__paymentError = errDetail;
     }
   } else {
     // No demo keypair configured — simulated payment
     txHash = randomBytes(32).toString("hex");
     verifiedOnChain = false;
+    (steps as any).__paymentError = { raw: "DEMO_AGENT_SECRET not configured on this server" };
   }
 
   const [payment] = await db
@@ -341,6 +348,11 @@ router.post("/demo/run", async (req, res): Promise<void> => {
     txHash,
     verified: verifiedOnChain,
     stellarExplorerUrl: verifiedOnChain ? stellarExplorerUrl : null,
+    _debug: {
+      demoKeypairConfigured: !!demoKeypair,
+      demoWalletAddress: demoKeypair?.publicKey() ?? null,
+      paymentError: (steps as any).__paymentError ?? null,
+    },
     summary: `Agent "${agent.name}" successfully completed the full x402 payment cycle: discovered service, authorized a scoped session, paid ${amountUsdc} USDC on Stellar Testnet${verifiedOnChain ? "" : " (simulated)"} (tx: ${txHash.slice(0, 16)}...), received service output, and earned ${stars}/5 stars, updating its reputation score to ${Math.round(newScore * 100) * 100 / 10000}.`,
   });
 });
