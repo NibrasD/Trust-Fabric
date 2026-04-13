@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
 type StepType = "http" | "payment" | "onchain";
 
 interface Step {
@@ -46,7 +48,7 @@ export default function NewWorkflow() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const r = await fetch("/api/workflows", {
+      const r = await fetch(`${API_BASE}/workflows`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description, isPublic, steps }),
