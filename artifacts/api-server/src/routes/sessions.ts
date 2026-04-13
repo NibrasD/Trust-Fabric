@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import { db, sessionsTable, agentsTable } from "@workspace/db";
 import {
   ListSessionsQueryParams,
@@ -16,12 +16,11 @@ function generateSessionToken(): string {
   return "stf_" + randomBytes(24).toString("hex");
 }
 
-async function formatSession(s: typeof sessionsTable.$inferSelect) {
-  const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, s.agentId));
+function formatSessionRow(s: typeof sessionsTable.$inferSelect, agentName: string) {
   return {
     id: String(s.id),
     agentId: String(s.agentId),
-    agentName: agent?.name ?? "Unknown",
+    agentName,
     sessionToken: s.sessionToken,
     maxSpendUsdc: Number(s.maxSpendUsdc),
     spentUsdc: Number(s.spentUsdc),
@@ -32,24 +31,16 @@ async function formatSession(s: typeof sessionsTable.$inferSelect) {
   };
 }
 
-async function expireOldSessions() {
-  const now = new Date();
-  const active = await db
-    .select()
-    .from(sessionsTable)
-    .where(eq(sessionsTable.status, "active"));
-  for (const s of active) {
-    if (s.expiresAt < now) {
-      await db
-        .update(sessionsTable)
-        .set({ status: "expired" })
-        .where(eq(sessionsTable.id, s.id));
-    }
-  }
+function expireOldSessionsAsync() {
+  db.update(sessionsTable)
+    .set({ status: "expired" })
+    .where(and(eq(sessionsTable.status, "active"), lt(sessionsTable.expiresAt, new Date())))
+    .catch(() => {});
 }
 
 router.get("/sessions", async (req, res): Promise<void> => {
-  await expireOldSessions();
+  expireOldSessionsAsync();
+
   const qp = ListSessionsQueryParams.safeParse(req.query);
   const { agentId, status } = qp.success ? qp.data : {};
 
@@ -58,12 +49,16 @@ router.get("/sessions", async (req, res): Promise<void> => {
   if (status) conditions.push(eq(sessionsTable.status, status));
 
   const rows = await db
-    .select()
+    .select({
+      session: sessionsTable,
+      agentName: agentsTable.name,
+    })
     .from(sessionsTable)
+    .leftJoin(agentsTable, eq(sessionsTable.agentId, agentsTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(sessionsTable.createdAt);
 
-  const sessions = await Promise.all(rows.map(formatSession));
+  const sessions = rows.map((r) => formatSessionRow(r.session, r.agentName ?? "Unknown"));
   res.json({ sessions });
 });
 

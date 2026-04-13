@@ -33,7 +33,7 @@ export default function NewSession() {
       agentId: "",
       maxSpendUsdc: 10,
       durationMinutes: 60,
-      allowedEndpoints: "api/v1/summarize",
+      allowedEndpoints: "/api/services/paid/summarize",
     },
   });
 
@@ -135,7 +135,7 @@ export default function NewSession() {
                   <FormItem>
                     <FormLabel>Allowed Endpoints</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="api/v1/summarize, api/v1/generate" className="font-mono text-sm" {...field} />
+                      <Textarea placeholder="/api/services/paid/summarize, /api/services/market/data" className="font-mono text-sm" {...field} />
                     </FormControl>
                     <FormDescription>
                       Comma-separated list of allowed API paths.

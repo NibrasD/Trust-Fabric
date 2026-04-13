@@ -10,7 +10,7 @@ import { Plus, KeyRound } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function SessionsList() {
-  const { data, isLoading } = useListSessions();
+  const { data, isLoading, isError, error } = useListSessions();
 
   return (
     <div className="space-y-6">
@@ -50,6 +50,12 @@ export default function SessionsList() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                   </TableRow>
                 ))
+              ) : isError ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-destructive">
+                    <p className="font-mono text-xs">{String(error)}</p>
+                  </TableCell>
+                </TableRow>
               ) : !data?.sessions?.length ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
