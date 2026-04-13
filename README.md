@@ -457,18 +457,15 @@ https://stellar-agent-trust-fabric.onrender.com/api/   → REST API
 # 1. Install all workspace dependencies
 pnpm install --frozen-lockfile
 
-# 2. Build shared libraries (DB schema, Zod types, React Query hooks)
-pnpm --filter @workspace/db \
-     --filter @workspace/api-zod \
-     --filter @workspace/api-client-react run build
-
-# 3. Build React frontend → artifacts/trust-fabric/dist/public/
+# 2. Build React frontend → artifacts/trust-fabric/dist/public/
+# (shared libs have no separate build step — bundled directly by Vite/esbuild)
 BASE_PATH=/ pnpm --filter @workspace/trust-fabric run build
 
-# 4. Bundle API server → artifacts/api-server/dist/
+# 3. Bundle API server → artifacts/api-server/dist/
+# (also bundles lib/db, lib/api-zod, lib/api-client-react via esbuild)
 pnpm --filter @workspace/api-server run build
 
-# 5. Start (API also serves frontend static files in NODE_ENV=production)
+# 4. Start (API also serves frontend static files in NODE_ENV=production)
 pnpm --filter @workspace/api-server run start
 ```
 

@@ -7,7 +7,6 @@ services:
     buildCommand: >
       npm install -g pnpm &&
       pnpm install --frozen-lockfile &&
-      pnpm --filter @workspace/db --filter @workspace/api-zod --filter @workspace/api-client-react run build &&
       BASE_PATH=/ pnpm --filter @workspace/trust-fabric run build &&
       pnpm --filter @workspace/api-server run build
     startCommand: pnpm --filter @workspace/api-server run start
