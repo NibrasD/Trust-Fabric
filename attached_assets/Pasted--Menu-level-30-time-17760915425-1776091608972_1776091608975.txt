@@ -1,0 +1,33 @@
+=> ///////////////////////////////////////////////////////////
+Menu
+{"level":30,"time":1776091542542,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":4,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776091547541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":5,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091552541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":6,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091553209,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":7,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091553366,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":8,"method":"GET","url":"/assets/index-DM-YKQFU.css"},"res":{"statusCode":200},"responseTime":39,"msg":"request completed"}
+{"level":30,"time":1776091553370,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":9,"method":"GET","url":"/assets/index-C_IZqJ63.js"},"res":{"statusCode":200},"responseTime":42,"msg":"request completed"}
+{"level":30,"time":1776091553783,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":10,"method":"GET","url":"/api/healthz"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091553806,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":14,"method":"GET","url":"/api/stellar/soroban"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091553862,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":15,"method":"GET","url":"/favicon.svg"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+/opt/render/project/src/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Command failed with signal "SIGTERM"
+{"level":30,"time":1776091557532,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":16,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":6,"msg":"request completed"}
+{"level":30,"time":1776091557541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":17,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091561387,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":13,"method":"GET","url":"/api/agents/stats/summary"},"res":{"statusCode":null},"responseTime":7594,"msg":"request aborted"}
+{"level":30,"time":1776091561388,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":12,"method":"GET","url":"/api/services/categories/counts"},"res":{"statusCode":null},"responseTime":7598,"msg":"request aborted"}
+{"level":30,"time":1776091561389,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":11,"method":"GET","url":"/api/payments/stats/volume"},"res":{"statusCode":null},"responseTime":7605,"msg":"request aborted"}
+{"level":30,"time":1776091562566,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":19,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":28,"msg":"request completed"}
+{"level":30,"time":1776091563258,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":18,"method":"GET","url":"/api/agents"},"res":{"statusCode":null},"responseTime":1862,"msg":"request aborted"}
+{"level":30,"time":1776091566192,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":22,"method":"GET","url":"/api/healthz"},"res":{"statusCode":304},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091567540,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":23,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776091570504,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":24,"method":"GET","url":"/api/healthz"},"res":{"statusCode":304},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091571270,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":28,"method":"GET","url":"/api/stellar/soroban"},"res":{"statusCode":304},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091572544,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":29,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":7,"msg":"request completed"}
+{"level":30,"time":1776091577541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":30,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776091582544,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":31,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091587531,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":32,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776091587568,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":33,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":24,"msg":"request completed"}
+{"level":30,"time":1776091590202,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":34,"method":"GET","url":"/api/healthz"},"res":{"statusCode":304},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1776091590204,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":35,"method":"GET","url":"/api/stellar/soroban"},"res":{"statusCode":304},"responseTime":0,"msg":"request completed"}
+{"level":30,"time":1776091592541,"pid":82,"hostname":"srv-d7ef8o77f7vs73ehj6eg-859fbf7fcf-f8xqm","req":{"id":36,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
