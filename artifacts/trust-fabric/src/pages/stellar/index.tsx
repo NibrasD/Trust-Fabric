@@ -407,7 +407,7 @@ export default function StellarLab() {
             )}
           </CardTitle>
           <CardDescription>
-            Authorize a scoped spending session for an agent. Payments without a session token bypass budget enforcement — create one to lock down the builder.
+            Authorize a scoped spending session for an agent. All payments require an active session — the builder is locked until a session is created.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -455,7 +455,7 @@ export default function StellarLab() {
               </div>
               <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-900/10 border border-yellow-700/20 text-xs text-yellow-600">
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>Without an active session, the payment builder allows unlimited transactions. Create a session to enforce spend limits.</span>
+                <span>No active session — the payment builder is locked. Create a session to authorize transactions with a spend limit.</span>
               </div>
               <Button
                 className="w-full"
@@ -770,29 +770,23 @@ export default function StellarLab() {
             <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-900/10 border border-green-700/20 text-xs text-green-500">
               <Lock className="h-3.5 w-3.5 shrink-0" />
               <span>Session active — budget enforcement on. Tx will be rejected if it exceeds the session limit.</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto h-5 px-2 text-[10px] text-muted-foreground hover:text-red-400"
-                onClick={() => setSessionTokenInBuilder("")}
-              >
-                Remove
-              </Button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted text-xs text-muted-foreground">
-              <Unlock className="h-3.5 w-3.5 shrink-0" />
-              <span>No session — payment will bypass budget enforcement. Create a session above to enable limits.</span>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-red-900/15 border border-red-700/30 text-xs text-red-400">
+              <XCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>No active session — all transactions are blocked. Create a session above to unlock the payment builder.</span>
             </div>
           )}
 
           <Button
             className="w-full"
             onClick={() => buildPaymentMutation.mutate(buildForm)}
-            disabled={buildPaymentMutation.isPending || !buildForm.fromSecretKey || !buildForm.toAddress}
+            disabled={buildPaymentMutation.isPending || !buildForm.fromSecretKey || !buildForm.toAddress || !sessionTokenInBuilder}
           >
             {buildPaymentMutation.isPending ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building Transaction...</>
+            ) : !sessionTokenInBuilder ? (
+              <><Lock className="mr-2 h-4 w-4" /> Session Required to Build</>
             ) : (
               "Build MPP Transaction"
             )}
@@ -853,10 +847,12 @@ export default function StellarLab() {
           <Button
             className="w-full"
             onClick={() => submitMutation.mutate(xdrToSubmit)}
-            disabled={submitMutation.isPending || !xdrToSubmit}
+            disabled={submitMutation.isPending || !xdrToSubmit || !sessionTokenInBuilder}
           >
             {submitMutation.isPending ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+            ) : !sessionTokenInBuilder ? (
+              <><Lock className="mr-2 h-4 w-4" /> Session Required to Submit</>
             ) : (
               "Submit Transaction"
             )}

@@ -226,6 +226,14 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
     return;
   }
 
+  if (!sessionToken) {
+    res.status(403).json({
+      error: "session_required",
+      message: "A valid session token is required to build a payment. Create a session first via POST /api/sessions.",
+    });
+    return;
+  }
+
   if (!isValidStellarAddress(toAddress)) {
     res.status(400).json({ error: "invalid_address", message: "toAddress is not a valid Stellar public key" });
     return;
@@ -236,21 +244,18 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
     return;
   }
 
-  // Session validation — if a session token is provided, enforce its budget
-  let sessionContext: { id: number; remainingUsdc: number; expiresAt: string } | null = null;
-  if (sessionToken) {
-    const result = await validateSessionBudget(sessionToken, amountUsdc);
-    if (result.error) {
-      res.status(403).json({ error: "session_denied", message: result.error });
-      return;
-    }
-    const s = result.session!;
-    sessionContext = {
-      id: s.id,
-      remainingUsdc: Number(s.maxSpendUsdc) - Number(s.spentUsdc),
-      expiresAt: s.expiresAt.toISOString(),
-    };
+  // Session validation — enforce budget and expiry
+  const validationResult = await validateSessionBudget(sessionToken, amountUsdc);
+  if (validationResult.error) {
+    res.status(403).json({ error: "session_denied", message: validationResult.error });
+    return;
   }
+  const s = validationResult.session!;
+  const sessionContext = {
+    id: s.id,
+    remainingUsdc: Number(s.maxSpendUsdc) - Number(s.spentUsdc),
+    expiresAt: s.expiresAt.toISOString(),
+  };
 
   try {
     const keypair = Keypair.fromSecret(fromSecretKey);
@@ -274,9 +279,7 @@ router.post("/stellar/payment/build", async (req, res): Promise<void> => {
       },
       network: "testnet",
       sessionContext,
-      instructions: sessionToken
-        ? "Pass the same sessionToken when submitting to deduct from your session budget"
-        : "Sign and submit this XDR to Stellar Testnet, then use the tx hash as X-PAYMENT header",
+      instructions: "Pass the same sessionToken when submitting to deduct from your session budget",
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -302,13 +305,19 @@ router.post("/stellar/payment/submit", async (req, res): Promise<void> => {
     return;
   }
 
+  if (!sessionToken || !amountUsdc) {
+    res.status(403).json({
+      error: "session_required",
+      message: "sessionToken and amountUsdc are required to submit a payment. Build the transaction with a valid session first.",
+    });
+    return;
+  }
+
   // Re-validate session budget at submit time to prevent TOCTOU races
-  if (sessionToken && amountUsdc) {
-    const check = await validateSessionBudget(sessionToken, amountUsdc);
-    if (check.error) {
-      res.status(403).json({ error: "session_denied", message: check.error });
-      return;
-    }
+  const check = await validateSessionBudget(sessionToken, amountUsdc);
+  if (check.error) {
+    res.status(403).json({ error: "session_denied", message: check.error });
+    return;
   }
 
   try {

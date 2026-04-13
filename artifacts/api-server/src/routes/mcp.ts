@@ -8,8 +8,8 @@
  */
 
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, agentsTable, proxiesTable, workflowsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, agentsTable, proxiesTable, workflowsTable, sessionsTable } from "@workspace/db";
+import { eq, desc, and, gt } from "drizzle-orm";
 import {
   buildMppPaymentTransaction,
   submitTransaction,
@@ -140,16 +140,61 @@ async function callTool(
   const err = (msg: string) => ({ content: [{ type: "text", text: `Error: ${msg}` }], isError: true });
 
   // Auto-pay helper: build + submit a Stellar USDC payment
+  // Enforces session key validation — no payment without an active session with sufficient budget
   async function autoPay(toAddress: string, amountUsdc: number): Promise<string | null> {
     if (!stellarSecret) return null;
     try {
       const fromKp = Keypair.fromSecret(stellarSecret);
+      const agentAddress = fromKp.publicKey();
+
+      // Look up the agent's active session with sufficient budget
+      const now = new Date();
+      const [agent] = await db
+        .select()
+        .from(agentsTable)
+        .where(eq(agentsTable.stellarAddress, agentAddress));
+      if (!agent) {
+        logger.warn({ tool: name, agentAddress }, "MCP auto-pay blocked: no registered agent for this key");
+        return null;
+      }
+
+      const [session] = await db
+        .select()
+        .from(sessionsTable)
+        .where(
+          and(
+            eq(sessionsTable.agentId, agent.id),
+            eq(sessionsTable.status, "active"),
+            gt(sessionsTable.expiresAt, now)
+          )
+        )
+        .limit(1);
+
+      if (!session) {
+        logger.warn({ tool: name, agentId: agent.id }, "MCP auto-pay blocked: no active session for agent");
+        return null;
+      }
+
+      const remaining = Number(session.maxSpendUsdc) - Number(session.spentUsdc);
+      if (amountUsdc > remaining) {
+        logger.warn({ tool: name, agentId: agent.id, amountUsdc, remaining }, "MCP auto-pay blocked: session budget exceeded");
+        return null;
+      }
+
       const { xdr } = await buildMppPaymentTransaction({
         fromKeypair: fromKp,
-        toAddress,
+        serviceAddress: toAddress,
         amountUsdc,
       });
       const result = await submitTransaction(xdr);
+
+      // Deduct from session budget after successful submission
+      const newSpent = Number(session.spentUsdc) + amountUsdc;
+      await db
+        .update(sessionsTable)
+        .set({ spentUsdc: String(newSpent) })
+        .where(eq(sessionsTable.id, session.id));
+
       return result.txHash;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
