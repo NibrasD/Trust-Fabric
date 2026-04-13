@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: stellar-agent-trust-fabric
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: >
+      npm install -g pnpm &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/db --filter @workspace/api-zod --filter @workspace/api-client-react run build &&
+      BASE_PATH=/ pnpm --filter @workspace/trust-fabric run build &&
+      pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: STELLAR_VERIFY_ONCHAIN
+        value: "true"
+      - key: USDC_ISSUER
+        value: GAIMP3OBUBK6Y72YGV3ZQJKRVQE5KH3VAIOG5QG2AB3VJCPQPBC4F3QP
+      - key: SUMMARIZER_ADDRESS
+        value: GDUQ244UFWD3DK3VEH665Y3ISELZBN6WMNHMA35QZ64K5LQWIDDMNZQB
+      - key: PROTOCOL_FEE_ADDRESS
+        value: GAUFDDTXBUK3SGKGZQVAXPJDAF3FTUAN325DEKIEUXEGFBMGMWQI5O75
+      - key: SOROBAN_REPUTATION_CONTRACT_ID
+        value: CAXV62IIEHBEPRNKZXYNEITMENNSX6U5Y7VT36N4XLI63ZNPCC73CRQ6
+      - key: SOROBAN_REGISTRY_CONTRACT_ID
+        value: CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA
+      - key: SOROBAN_SESSION_CONTRACT_ID
+        value: CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7
+      - key: DEMO_AGENT_SECRET
+        sync: false
+      - key: STELLAR_FAUCET_SECRET
+        sync: false
+      - key: SOROBAN_ADMIN_SECRET
+        sync: false

@@ -365,26 +365,32 @@ workflow_executions
 
 ### Environment Variables
 
-```bash
-# Supabase
-SUPABASE_DATABASE_URL=postgresql://...
-SESSION_SECRET=your-session-secret
+Copy `.env.example` to `.env` and fill in your values:
 
-# Stellar
-STELLAR_SECRET=SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   # admin keypair
-STELLAR_VERIFY_ONCHAIN=true   # omit for dev mode (accepts any 64-char hash)
-SUMMARIZER_ADDRESS=GDUQ244U...
+```bash
+cp .env.example .env
 ```
+
+Key variables:
+
+| Variable | Required | Description |
+|---|---|---|
+| `SUPABASE_DATABASE_URL` | Yes | Supabase PostgreSQL connection string |
+| `SESSION_SECRET` | Yes | Random string for cookie signing (min 32 chars) |
+| `DEMO_AGENT_SECRET` | Yes | Stellar secret key for the demo wallet |
+| `STELLAR_FAUCET_SECRET` | Yes | Secret key of the USDC issuer/faucet account |
+| `SOROBAN_ADMIN_SECRET` | Yes | Admin keypair for Soroban contract invocations |
+| `STELLAR_VERIFY_ONCHAIN` | No | `"true"` to verify payments on Horizon; omit for dev mode |
 
 ### Run Locally
 
 ```bash
 pnpm install
 
-# Start the API server
+# Start the API server (port 8080)
 pnpm --filter @workspace/api-server run dev
 
-# Start the frontend
+# Start the frontend (port 3000)
 pnpm --filter @workspace/trust-fabric run dev
 ```
 
@@ -397,6 +403,73 @@ curl http://localhost:8080/api/services/market/data
 # 2. Call with a 64-char hex payment hash (dev mode skips on-chain check)
 curl -X POST http://localhost:8080/api/services/market/data \
   -H "X-PAYMENT: A1B2C3D4E5F6789012345678901234567890ABCDEF0123456789ABCDEF012345"
+```
+
+---
+
+## Deploy to Render
+
+The project ships with a `render.yaml` Blueprint for one-click deployment as a single Web Service (API + frontend bundled together).
+
+### Steps
+
+**1. Push to GitHub**
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/<you>/stellar-agent-trust-fabric.git
+git push -u origin main
+```
+
+**2. Create Render service**
+
+- Go to [render.com](https://render.com) → **New** → **Blueprint**
+- Connect your GitHub repo
+- Render reads `render.yaml` automatically and configures the service
+
+**3. Set secret environment variables**
+
+In the Render dashboard → your service → **Environment**, add:
+
+| Variable | Value |
+|---|---|
+| `SUPABASE_DATABASE_URL` | Your Supabase connection string |
+| `DEMO_AGENT_SECRET` | Stellar secret key of the demo wallet |
+| `STELLAR_FAUCET_SECRET` | Stellar secret key of the USDC faucet |
+| `SOROBAN_ADMIN_SECRET` | Admin keypair for Soroban |
+
+All other variables (contract IDs, addresses, `STELLAR_VERIFY_ONCHAIN`) are pre-configured in `render.yaml`.
+
+**4. Deploy**
+
+Render builds and starts the service automatically. The API serves the React dashboard as static files — no separate frontend deployment needed.
+
+```
+https://stellar-agent-trust-fabric.onrender.com/       → Dashboard (React)
+https://stellar-agent-trust-fabric.onrender.com/api/   → REST API
+```
+
+### Build Process (what Render runs)
+
+```bash
+# 1. Install all workspace dependencies
+pnpm install --frozen-lockfile
+
+# 2. Build shared libraries (DB schema, Zod types, React Query hooks)
+pnpm --filter @workspace/db \
+     --filter @workspace/api-zod \
+     --filter @workspace/api-client-react run build
+
+# 3. Build React frontend → artifacts/trust-fabric/dist/public/
+BASE_PATH=/ pnpm --filter @workspace/trust-fabric run build
+
+# 4. Bundle API server → artifacts/api-server/dist/
+pnpm --filter @workspace/api-server run build
+
+# 5. Start (API also serves frontend static files in NODE_ENV=production)
+pnpm --filter @workspace/api-server run start
 ```
 
 ---
