@@ -34,6 +34,8 @@ services:
         value: CDG7G7MBLWLG3FD3YPMVGCFWB4HCF7PWSX2VIOHIAUVBJ23QQAMSPPHA
       - key: SOROBAN_SESSION_CONTRACT_ID
         value: CAKSBWFSRPCBN6XHV5PUOVHU5234CHOGZNXKLXBOAUW4RZCIL45RU2F7
+      - key: API_BASE_URL
+        value: https://stellar-agent-trust-fabric.onrender.com
       - key: DEMO_AGENT_SECRET
         sync: false
       - key: STELLAR_FAUCET_SECRET
